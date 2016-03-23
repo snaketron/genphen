@@ -1,0 +1,20 @@
+# Export all names
+export(
+  runGenphenSnp,
+  runGenphenSaap,
+  plotSpecificGenotype,
+  plotGenphenResults,
+  plotManhattan
+)
+
+# Import packages listed as Imports or Depends
+import(
+  e1071,
+  ggplot2,
+  effsize,
+  Biostrings
+)
+
+importFrom("randomForest", randomForest)
+
+#exportPattern("^[[:alpha:]]+")

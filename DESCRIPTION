@@ -1,0 +1,25 @@
+Package: genphen
+Type: Package
+Title: A tool for computing genotype-phenotype associations using
+        statistical learning techniques
+Version: 0.99.8
+Date: 2016-03-20
+Author: Simo Kitanovski
+Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
+Description: Given a set of genetic polymorphisms in the form of single
+        nucleotide poylmorphisms or single amino acid polymorphisms and
+        a corresponding phenotype data, often we are interested to
+        quantify their association such that we can identify the causal
+        polymorphisms. Using statistical learning techniques such as
+        random forests and support vector machines, this tool provides
+        the means to estimate genotype-phenotype associations. It also
+        provides visualization functions which enable the user to
+        visually inspect the results of such genetic association study
+        and conveniently select the genotypes which have the highest
+        strenght ofassociation with the phenotype.
+License: GPL (>= 2)
+Depends: R(>= 3.3), randomForest, e1071, ggplot2, effsize, Biostrings
+LazyLoad: yes
+biocViews: GenomeWideAssociation, Regression, Classification,
+        SupportVectorMachine, Genetics, SequenceMatching
+NeedsCompilation: no
