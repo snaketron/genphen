@@ -2,7 +2,7 @@ Package: genphen
 Type: Package
 Title: A tool for computing genotype-phenotype associations using
         statistical learning techniques
-Version: 0.99.8
+Version: 1.0.0
 Date: 2016-03-20
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
