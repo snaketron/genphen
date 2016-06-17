@@ -1,25 +1,27 @@
 Package: genphen
 Type: Package
-Title: A tool for computing genotype-phenotype associations using
-        statistical learning techniques
-Version: 1.1.0
-Date: 2016-03-20
+Title: A tool for quantification of genotype-phenotype associations using
+    statistical learning techniques
+Version: 1.0.1
+Date: 2016-06-17
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
-Description: Given a set of genetic polymorphisms in the form of single
-        nucleotide poylmorphisms or single amino acid polymorphisms and
-        a corresponding phenotype data, often we are interested to
-        quantify their association such that we can identify the causal
-        polymorphisms. Using statistical learning techniques such as
-        random forests and support vector machines, this tool provides
-        the means to estimate genotype-phenotype associations. It also
-        provides visualization functions which enable the user to
-        visually inspect the results of such genetic association study
-        and conveniently select the genotypes which have the highest
-        strenght ofassociation with the phenotype.
+Description: Given a set of genetic polymorphisms in the form of
+    single nucleotide polymorphisms or single amino acid polymorphisms
+    and a corresponding phenotype data, often we are interested in
+    quantifying their association such that we can identify the causal
+    polymorphisms. Using statistical learning techniques such as
+    random forests and support vector machines, this tool provides
+    the means to quantify genotype-phenotype associations. It also
+    provides visualization functions which enable the user to visually
+    inspect the results of such genetic association study and
+    conveniently select the genotypes which have the highest strength
+    of association with the phenotype.
 License: GPL (>= 2)
-Depends: R(>= 3.3), randomForest, e1071, ggplot2, effsize, Biostrings
+Depends: R(>= 3.3), randomForest, e1071, ggplot2, effsize,
+    Biostrings
 LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
-        SupportVectorMachine, Genetics, SequenceMatching
+    SupportVectorMachine, Genetics, SequenceMatching
 NeedsCompilation: no
+
