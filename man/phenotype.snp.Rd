@@ -30,7 +30,7 @@ compute the association between each of the SNPs and the phenotype.
 
 
 \format{
-A numerical vecotr with 51 elements (laboratory mice) which correspond to
+A numerical vector with 51 elements (laboratory mice) which correspond to
 the rows of he genotype data.
 }
 

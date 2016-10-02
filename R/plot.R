@@ -6,31 +6,104 @@
 # entry is plotted as point with respect to its effect size and classification
 # accuracy attributes.
 # Return: ggplot object of the plot
-plotGenphenResults <- function(genphen.results) {
+plotGenphenRfSvm <- function(genphen.results = NULL) {
+
+  # check for NA or NULL
+  if(is.null(genphen.results)) {
+    stop("the 'genphen.results' is NULL.")
+  }
 
   # check for empty row
   if(all(is.na(genphen.results))) {
     stop("the 'genphen.results' contains only NAs")
   }
 
-  # tricking R-CMD check
-  classification.accuracy <- effect.size <- ca <- NULL
+  # check for 0 row count
+  if(nrow(genphen.results) == 0) {
+    stop("the 'genphen.results' has 0 rows.")
+  }
 
-  g <- ggplot2::ggplot()+
-    geom_point(data = genphen.results,
-               aes(x = ca, y = abs(effect.size)), size = 2.5, col = "black")+
-    geom_point(data = genphen.results,
-               aes(x = ca, y = abs(effect.size), col = ca), size = 2)+
+  # tricking R-CMD check
+  d <- ca <- ca.hdi.high <- ca.hdi.low <- NULL
+
+  g <- ggplot2::ggplot(data = genphen.results)+
+    geom_errorbarh(aes(xmax = ca.hdi.H, xmin = ca.hdi.L,
+                       x = ca, y = abs(d)), height = 0.025)+
+    geom_point(aes(x = ca, y = abs(d), fill = kappa),
+               col = "black", pch = 21, size = 3)+
     theme_bw()+
-    scale_color_gradient(low = "#c7d9e8",  high = "#2a4e6c")+
     xlab('Classification accuracy')+
     ylab('Effect size')+
-    theme(legend.position = "none")+
     theme(text = element_text(size = 12))+
-    xlim(c(0, 1))
+    xlim(c(0, 1))+
+    scale_fill_gradientn(colours = terrain.colors(10))
   print(g)
   return(g)
 }
+
+
+
+
+
+# Description:
+# It plots the results of the different method runGenphen* methods. Each result
+# entry is plotted as point with respect to its effect size and classification
+# accuracy attributes.
+# Return: ggplot object of the plot
+plotGenphenBayes <- function(genphen.results = NULL, hdi) {
+
+  # check for NA or NULL
+  if(is.null(genphen.results)) {
+    stop("the 'genphen.results' is NULL.")
+  }
+
+  # check for empty row
+  if(all(is.na(genphen.results))) {
+    stop("the 'genphen.results' contains only NAs")
+  }
+
+  # check for 0 row count
+  if(nrow(genphen.results) == 0) {
+    stop("the 'genphen.results' has 0 rows.")
+  }
+
+  l <- which(regexpr(pattern = paste("mu.effect", hdi, "L", sep = '.'),
+                     text = colnames(genphen.results)) != -1)
+  if(length(l) != 1) {
+    stop("select correct L hdi.")
+  }
+
+  h <- which(regexpr(pattern = paste("mu.effect", hdi, "H", sep = '.'),
+                     text = colnames(genphen.results)) != -1)
+  if(length(h) != 1) {
+    stop("select correct H hdi.")
+  }
+
+
+
+  # tricking R-CMD check
+  mu.effect <- NULL
+
+  g <- ggplot2::ggplot(data = genphen.results)+
+    geom_errorbarh(aes(xmax = genphen.results[, h],
+                       xmin = genphen.results[, l],
+                       x = mu.effect,
+                       y = as.factor(paste(g.1, site, g.2, sep = ''))),
+                   height = 0.025)+
+    geom_point(aes(x = mu.effect,
+                   y = as.factor(paste(g.1, site, g.2, sep = ''))),
+               fill = "white", col = "black", pch = 21, size = 3)+
+    theme_bw()+
+    xlab('Bayesian effect size (mu.effect)')+
+    ylab('Polymorphism')+
+    theme(legend.position = "none")+
+    theme(text = element_text(size = 12))+
+    geom_vline(xintercept = 0, col = "red", linetype = "dashed")
+  print(g)
+  return(g)
+}
+
+
 
 
 
@@ -182,35 +255,34 @@ plotSpecificGenotype <- function(genotype, phenotype, index) {
 # with FDR, then transformed to -log10, and finaly plotted as the so-called
 # Manhattan plots.
 # Return: ggplot object of the plot
-plotManhattan <- function(genphen.results) {
+plotManhattan <- function(genphen.results = NULL) {
+
+  # check for NA or NULL
+  if(is.null(genphen.results)) {
+    stop("the 'genphen.results' is NULL.")
+  }
 
   # check for empty row
   if(all(is.na(genphen.results))) {
     stop("the 'genphen.results' contains only NAs")
   }
 
-  # correct with FDR and convert to -log
-  genphen.results$corrected.anova <-
-    stats::p.adjust(p = genphen.results$anova.score, method = "fdr")
-  genphen.results$corrected.anova <-
-    -log(x = genphen.results$corrected.anova, base = 10)
-
-  # tricking R-CMD check
-  corrected.anova <- NULL
+  # check for 0 row count
+  if(nrow(genphen.results) == 0) {
+    stop("the 'genphen.results' has 0 rows.")
+  }
 
   g <- ggplot(data = genphen.results)+
-    geom_point(aes(x = 1:nrow(genphen.results), y = corrected.anova),
-               col = "black", size = 2.4)+
-    geom_point(aes(x = 1:nrow(genphen.results), y = corrected.anova,
-                   col = corrected.anova), size = 2)+
+    geom_point(aes(x = 1:nrow(genphen.results), y = abs(t.test.pvalue)),
+               fill = "white", col = "black", pch = 21, size = 3)+
     theme_bw()+
-    scale_color_gradient(low = "#c7d9e8",  high = "#2a4e6c")+
     xlab('genotypes')+
-    ylab('-log10 (p-value)')+
+    ylab('-log10 (P-values)')+
     theme(legend.position = "right")+
     theme(text = element_text(size = 12))
   print(g)
   return(g)
 }
+
 
 

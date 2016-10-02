@@ -45,7 +45,7 @@ specific.genotype.plot <- plotSpecificGenotype(genotype = genotype.snp,
 phenotype = phenotype.snp, index = 1)
 
 #Example 2:
-data(genotype.saap) #or ata(genotype.saap.msa)
+data(genotype.saap) #or data(genotype.saap.msa)
 data(phenotype.saap)
 specific.genotype.plot <- plotSpecificGenotype(genotype = genotype.saap,
 phenotype = phenotype.saap, index = 3)
@@ -54,7 +54,8 @@ phenotype = phenotype.saap, index = 3)
 
 
 \seealso{
-runGenphenSaap, runGenphenSnp, plotGenphenResults, plotManhattan
+runGenphenRf, runGenphenSvm, runGenphenBayesian, plotGenphenResults,
+plotManhattan
 }
 
 

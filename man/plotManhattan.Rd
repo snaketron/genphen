@@ -17,15 +17,15 @@ plotManhattan(genphen.results)
 
 
 \arguments{
-  \item{genphen.results}{Data.frame resulting from runGenphenSnp or
-  runGenphenSaap.}
+  \item{genphen.results}{Data.frame resulting from runGenphenRf, runGenphenSvm
+  or runGenphenBayesian.}
 }
 
 
 
 \description{
-This procedure plots the results obtained using runGenphenSnp or
-runGenphenSaap.
+This procedure plots the complementary T-test results obtained using
+runGenphenRf, runGenphenSvm or runGenphenBayesian.
 }
 
 
@@ -33,36 +33,46 @@ runGenphenSaap.
 \examples{
 #Example 1:
 data(genotype.snp)
-#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:5]
+#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:20]
 data(phenotype.snp)
-genphen.results <- runGenphenSnp(genotype = genotype.snp[, 1:5],
-phenotype = phenotype.snp, technique = "svm", fold.cv = 0.66, boots = 100)
-manhattan.plot <- plotManhattan(genphen.results = genphen.results)
+genphen.rf <- runGenphenRf(genotype = genotype.saap[, 1:20],
+                           phenotype = phenotype.saap,
+                           cv.fold = 0.66,
+                           cv.steps = 100,
+                           hdi.level = 0.99,
+                           ntree = 1000)
+plotManhattan(genphen.results = genphen.rf)
+
 
 #Example 2:
 data(genotype.saap)
-#or data(genotype.saap.msa) in this case you cannot subset genotype.saap[, 1:5]
+#or data(genotype.saap.msa) in this case you cannot subset genotype.saap[, 1:29]
 data(phenotype.saap)
-genphen.results <- runGenphenSaap(genotype = genotype.saap[, 1:5],
-phenotype = phenotype.saap, technique = "svm", fold.cv = 0.66, boots = 100)
-manhattan.plot <- plotManhattan(genphen.results = genphen.results)
+genphen.bayesian <- runGenphenBayesian(genotype = genotype.saap[, 1:20],
+                                       phenotype = phenotype.saap,
+                                       chain.nr = 2,
+                                       mcmc.iter = 20000,
+                                       model = "tdist",
+                                       hdi.levels = 0.99)
+plotManhattan(genphen.results = genphen.bayesian)
 }
 
 
 
 \seealso{
-runGenphenSaap, runGenphenSnp, plotGenphenResults, plotSpecificGenotype
+runGenphenRf, runGenphenSvm, runGenphenBayesian, plotGenphenResults,
+plotSpecificGenotype
 }
 
 
 
 \details{
-This procedure plots the results obtained using runGenphenSnp or runGenphenSaap.
-Each result entry is plotted as a point with respect to its effect size and
-classification accuracy attributes, whereby the color of the points is directly
-proportional to the classification accuracy. The region in the top-right corner
-of the plot is where the genotypes which have the strongest association with
-the phenotype are found.
+This procedure plots the results from a two-sample T-test analysis, conducted in
+each of the three functions: runGenphenRf, runGenphenSvm or runGenphenBayesian.
+The P-values resulting from the T-test are first corrected by the Benjamini
+-Hochberg correction procedure (FDR), followed by a -log10 transformation. These
+values are then plotted as points, where each point corresponds to a single
+genotype-phenotype association as seen in a classical Manhattan plot.
 }
 
 

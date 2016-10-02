@@ -1,27 +1,33 @@
 Package: genphen
 Type: Package
-Title: A tool for quantification of genotype-phenotype associations using
-    statistical learning techniques
-Version: 1.0.1
-Date: 2016-06-17
+Title: A tool for quantification of associations between genotypes and
+    phenotypes with statistical learning techniques such as random forests
+    and support vector machines as well as with Bayesian inference using
+    hierarchical models
+Version: 1.0.2
+Date: 2016-09-28
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
-Description: Given a set of genetic polymorphisms in the form of
-    single nucleotide polymorphisms or single amino acid polymorphisms
-    and a corresponding phenotype data, often we are interested in
-    quantifying their association such that we can identify the causal
-    polymorphisms. Using statistical learning techniques such as
-    random forests and support vector machines, this tool provides
-    the means to quantify genotype-phenotype associations. It also
-    provides visualization functions which enable the user to visually
-    inspect the results of such genetic association study and
-    conveniently select the genotypes which have the highest strength
-    of association with the phenotype.
+Description: Genetic association studies have become an essential tool for
+    studying the relationship between genotypes and phenotypes. They are
+    necessary for the discovery of disease-causing genetic variants. Here we
+    provide a tool for conducting genetic association studies, which uses
+    statistical learning techniques such as random forests and support vector
+    machines, as well as using Bayesian inference with Bayesian hierarchical
+    models. These techniques are superior to the commonly used (frequentist)
+    statistical approaches, alleviating the multiple hypothesis problems and
+    the need for P value corrections, which often lead to massive numbers of
+    false negatives. Thus, with genphen we provide a framework to compare the
+    results obtained using frequentist methods with those obtained using the
+    more sophisticated methods provided by this tool. The tool also provides a
+    few visualization functions which enable the user to inspect the results of
+    such genetic association study and conveniently select the genotypes which
+    have the highest strength of association with the phenotype.
 License: GPL (>= 2)
 Depends: R(>= 3.3), randomForest, e1071, ggplot2, effsize,
-    Biostrings
+    Biostrings, rjags
 LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
-    SupportVectorMachine, Genetics, SequenceMatching
+    SupportVectorMachine, Genetics, SequenceMatching, Bayesian,
+    FeatureExtraction, Sequencing
 NeedsCompilation: no
-

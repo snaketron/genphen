@@ -23,7 +23,7 @@ between each of the SAAP and the phenotype.
 
 
 \format{
-A numerical vecotr with 120 elements (organisms) which correspond to the rows
+A numerical vector with 120 elements (organisms) which correspond to the rows
 of he genotype data.
 }
 

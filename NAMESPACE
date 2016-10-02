@@ -1,9 +1,11 @@
 # Export all names
 export(
-  runGenphenSnp,
-  runGenphenSaap,
+  runGenphenRf,
+  runGenphenSvm,
+  runGenphenBayes,
   plotSpecificGenotype,
-  plotGenphenResults,
+  plotGenphenRfSvm,
+  plotGenphenBayes,
   plotManhattan
 )
 
@@ -12,7 +14,8 @@ import(
   e1071,
   ggplot2,
   effsize,
-  Biostrings
+  Biostrings,
+  rjags
 )
 
 importFrom("randomForest", randomForest)
