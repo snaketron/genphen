@@ -1,0 +1,12 @@
+model {
+  for (i in 1:Ny) {
+    y[i] ~ dt(mu[x[i]], 1/sigma[x[i]]^2, nu[x[i]])
+  }
+
+  for(j in 1:2) {
+    mu[j] ~ dnorm(meanY[j], 1/(100*sdY[j])^2)
+    sigma[j] ~ dunif(sdY[j]/100, sdY[j]*10)
+    nu[j] = nuPos[j] + 1
+    nuPos[j] ~ dexp(1/29)
+  }
+}
