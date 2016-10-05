@@ -370,14 +370,14 @@ alternative statistical method (RF).
 
 
 \paragraph{runGenphenBayes}
-%' <<sectionTag>>=
-%' result <- runGenphenBayes(genotype = genotype,
-%'                           phenotype = phenotype,
-%'                           chain.nr = 4,
-%'                           mcmc.iter = 10000,
-%'                           model = "tdist",
-%'                           hdi.levels = 0.95)
-%' @
+<<sectionTag>>=
+result <- runGenphenBayes(genotype = genotype,
+                          phenotype = phenotype,
+                          chain.nr = 2,
+                          mcmc.iter = 1000,
+                          model = "tdist",
+                          hdi.levels = 0.95)
+@
 \begin{table}[H] \centering
 \begin{tabular}{@{\extracolsep{-4pt}} ccccccccccc}
 \hline
@@ -492,8 +492,8 @@ If only a single data point is available for a given genetic state of a SAAP
 <<sectionTag>>=
 result <- runGenphenBayes(genotype = genotype,
                           phenotype = phenotype,
-                          chain.nr = 4,
-                          mcmc.iter = 10000,
+                          chain.nr = 2,
+                          mcmc.iter = 1000,
                           model = "tdist",
                           hdi.levels = 0.95)
 @
@@ -645,7 +645,7 @@ plotManhattan(genphen.results = genphen.rf)
 # with genotype.snp[, 1:10]
 genphen.bayes <- runGenphenBayes(genotype = genotype.saap[, 1:10],
                                  phenotype = phenotype.saap,
-                                 chain.nr = 4,
+                                 chain.nr = 2,
                                  mcmc.iter = 1000,
                                  model = "tdist",
                                  hdi.levels = c(0.90, 0.95, 0.99))

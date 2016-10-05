@@ -93,7 +93,7 @@ data(phenotype.saap)
 genphen.bayes <- runGenphenBayes(genotype = genotype.saap[, 1:5],
                                  phenotype = phenotype.saap,
                                  mcmc.iter = 1000,
-                                 chain.nr = 4,
+                                 chain.nr = 2,
                                  model = "tdist",
                                  hdi.levels = c(0.95, 0.99))
 }
