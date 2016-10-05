@@ -44,7 +44,7 @@ genphen.bayes <- runGenphenBayes(genotype = genotype.saap[, 1:5],
                                  chain.nr = 4,
                                  model = "tdist",
                                  hdi.levels = c(0.95, 0.99))
-plotGenphenBayes(genphen.results = genphen.bayes)
+plotGenphenBayes(genphen.results = genphen.bayes, hdi = 0.95)
 }
 
 

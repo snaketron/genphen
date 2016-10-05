@@ -106,12 +106,6 @@ genphen.rf <- runGenphenRf(genotype = genotype.saap[, 1:5],
                            cv.steps = 100,
                            hdi.level = 0.99,
                            ntree = 1000)
-
-# remove SNPs whose associations could not be computed (few data points)
-genphen.rf <- genphen.rf[complete.cases(genphen.rf), ]
-
-# plotting results
-plotGenphenRfSvm(genphen.results = genphen.rf)
 }
 
 

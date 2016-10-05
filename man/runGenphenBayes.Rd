@@ -20,7 +20,8 @@ association between genotypes (SNPs or SAAPs) and phenotypes.
 
 
 \usage{
-runGenphenBayes(genotype, phenotype, model, mcmc.iter, chain.nr, hdi.levels)
+runGenphenBayes(genotype, phenotype, chain.nr, mcmc.iter, model, hdi.levels)
+
 }
 
 
@@ -30,13 +31,13 @@ columns or alternatively as DNAMultipleAlignment or AAMultipleAlignment
 Biostrings object.}
 \item{phenotype}{Numerical vector, where each element is a measured phenotype
 corresponding to the observations of the genotype data.}
+\item{chain.nr}{Number of MCMC chains to simulate (recommended > 1).}
+\item{mcmc.iter}{Number of MCMC iterations used in the Bayesian inference
+(recommended >= 1000).}
 \item{model}{The hierarchical model used for the Bayesian inference (currently
 only two models are available). In case of a normally distributed phenotype,
 the model 'ndist' should be used, and 'tdist' if it is t-distributed (more
 robust to outliers).}
-\item{mcmc.iter}{Number of MCMC iterations used in the Bayesian inference
-(recommended >= 1000).}
-\item{chain.nr}{Number of MCMC chains to simulate (recommended > 1).}
 \item{hdi.levels}{Highest density intervals (HDI) (default = c(0.95, 0.99)).}
 }
 
@@ -95,19 +96,6 @@ genphen.bayes <- runGenphenBayes(genotype = genotype.saap[, 1:5],
                                  chain.nr = 4,
                                  model = "tdist",
                                  hdi.levels = c(0.95, 0.99))
-
-# remove SNPs whose associations could not be computed (few data points)
-genphen.bayes <- genphen.bayes[complete.cases(genphen.bayes), ]
-
-# plotting results
-plotGenphenBayes(genphen.results = genphen.bayes, hdi = 0.95)
-
-# filter based on 95\% HDI (effect = 0 should not be in interval)
-genphen.bayes <- genphen.bayes[!(genphen.bayes$mu.effect.0.95.L <= 0
-                               & genphen.bayes$mu.effect.0.95.H >= 0), ]
-
-# plotting results
-plotGenphenBayes(genphen.results = genphen.bayes, hdi = 0.95)
 }
 
 

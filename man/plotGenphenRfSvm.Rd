@@ -32,34 +32,22 @@ or runGenphenSvm.
 \examples{
 #Example 1 (RF results):
 data(genotype.snp)
-#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:20]
+#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:5]
 data(phenotype.snp)
-genphen.rf <- runGenphenRf(genotype = genotype.saap[, 1:20],
-                           phenotype = phenotype.saap,
+genphen.rf <- runGenphenRf(genotype = genotype.snp[, 1:5],
+                           phenotype = phenotype.snp,
                            cv.fold = 0.66,
                            cv.steps = 100,
                            hdi.level = 0.99,
                            ntree = 1000)
 plotGenphenRfSvm(genphen.results = genphen.rf)
-
-
-#Example 2 (SVM results):
-data(genotype.saap)
-#or data(genotype.saap.msa) in this case you cannot subset genotype.saap[, 1:20]
-data(phenotype.saap)
-genphen.svm <- runGenphenSvm(genotype = genotype.saap[, 1:20],
-                             phenotype = phenotype.saap,
-                             cv.fold = 0.66,
-                             cv.steps = 100,
-                             hdi.level = 0.99)
-plotGenphenRfSvm(genphen.results = genphen.svm)
 }
 
 
 
 \seealso{
-runGenphenRf, runGenphenSvm, runGenphenBayes, plotGenphenBayes,
-plotSpecificGenotype
+runGenphenRf, runGenphenSvm, plotGenphenBayes,
+plotSpecificGenotype, plotManhattan
 }
 
 

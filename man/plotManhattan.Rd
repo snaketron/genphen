@@ -25,7 +25,7 @@ plotManhattan(genphen.results)
 
 \description{
 This procedure plots the complementary T-test results obtained using
-runGenphenRf, runGenphenSvm or runGenphenBayesian.
+runGenphenRf, runGenphenSvm or runGenphenBayes.
 }
 
 
@@ -33,34 +33,21 @@ runGenphenRf, runGenphenSvm or runGenphenBayesian.
 \examples{
 #Example 1:
 data(genotype.snp)
-#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:20]
+#or data(genotype.snp.msa) in this case you cannot subset genotype.snp[, 1:5]
 data(phenotype.snp)
-genphen.rf <- runGenphenRf(genotype = genotype.saap[, 1:20],
-                           phenotype = phenotype.saap,
+genphen.rf <- runGenphenRf(genotype = genotype.snp[, 1:5],
+                           phenotype = phenotype.snp,
                            cv.fold = 0.66,
                            cv.steps = 100,
                            hdi.level = 0.99,
                            ntree = 1000)
 plotManhattan(genphen.results = genphen.rf)
-
-
-#Example 2:
-data(genotype.saap)
-#or data(genotype.saap.msa) in this case you cannot subset genotype.saap[, 1:29]
-data(phenotype.saap)
-genphen.bayesian <- runGenphenBayesian(genotype = genotype.saap[, 1:20],
-                                       phenotype = phenotype.saap,
-                                       chain.nr = 2,
-                                       mcmc.iter = 20000,
-                                       model = "tdist",
-                                       hdi.levels = 0.99)
-plotManhattan(genphen.results = genphen.bayesian)
 }
 
 
 
 \seealso{
-runGenphenRf, runGenphenSvm, runGenphenBayesian, plotGenphenResults,
+runGenphenRf, runGenphenSvm, plotGenphenBayes, plotGenphenRfSvm,
 plotSpecificGenotype
 }
 

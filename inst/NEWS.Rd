@@ -11,11 +11,11 @@
     }
   }
 
-  \subsection{Changes} {
+  \subsection{Changes}{
     \itemize{
       \item Bayesian inference implemented alongside the statistical learning
       techniques.
-    } 
+    }
   }
 
   \subsection{To do}{

@@ -94,7 +94,7 @@ about the genotype.}
 data(genotype.saap)
 #or data(genotype.saap.msa) in this case you cannot subset genotype.saap[, 1:5]
 data(phenotype.saap)
-genphen.svm <- runGenpenSvm(genotype = genotype.saap[, 1:5],
+genphen.svm <- runGenphenSvm(genotype = genotype.saap[, 1:5],
                             phenotype = phenotype.saap,
                             cv.fold = 0.66,
                             cv.steps = 100,
