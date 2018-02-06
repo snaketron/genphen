@@ -41,24 +41,16 @@ runGenphen <- function(genotype = NULL,
                                  min.observations = 3)
 
 
+  # compile model
+  compileModel(phenotype.type = phenotype.type)
+
+
   convergence <- NULL
   results <- NULL
   ppc <- NULL
   cas <- NULL
   for(s in 1:length(genphen.data)) {
     if(phenotype.type == "continuous") {
-      # model.stan <- get(load(file = "inst/extdata/continuous.stan.RData"))
-      # model.stan <- get(load(system.file("extdata", "continuous.stan.RData",
-      #                                    package = "genphen")))
-
-      cat("============================================================= \n")
-      cat("===================== Compiling Model ======================= \n")
-      cat("============================================================= \n")
-      # f <- "inst/extdata/continuous.stan"
-      f <- system.file("extdata", "continuous.stan", package = "genphen")
-      model.stan <- stan_model(file = f, model_name = "continuous")
-
-
 
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
       cat("============================================================= \n")
@@ -77,18 +69,6 @@ runGenphen <- function(genotype = NULL,
       gc(verbose = FALSE)
     }
     else if(phenotype.type == "dichotomous") {
-      # model.stan <- get(load(file = "inst/extdata/dichotomous.stan.RData"))
-      # model.stan <- get(load(system.file("extdata", "dichotomous.stan.RData",
-      #                                    package = "genphen")))
-
-      cat("============================================================= \n")
-      cat("===================== Compiling Model ======================= \n")
-      cat("============================================================= \n")
-      # f <- "inst/extdata/dichotomous.stan"
-      f <- system.file("extdata", "dichotomous.stan", package = "genphen")
-      model.stan <- stan_model(file = f, model_name = "dichotomous")
-
-
 
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
       cat("============================================================= \n")
@@ -156,4 +136,6 @@ runGenphen <- function(genotype = NULL,
               convergence = convergence,
               debug.scores = scores))
 }
+
+
 

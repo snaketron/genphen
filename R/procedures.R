@@ -1080,5 +1080,20 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 
 
-
-
+# Description:
+# Given a phenotype.type, the procedure compiles the appropriate STAN model.
+compileModel <- function(phenotype.type) {
+  cat("============================================================= \n")
+  cat("===================== Compiling Model ======================= \n")
+  cat("============================================================= \n")
+  if(phenotype.type == "continuous") {
+    # f <- "inst/extdata/continuous.stan"
+    f <- system.file("extdata", "continuous.stan", package = "genphen")
+    model.stan <- stan_model(file = f, model_name = "continuous")
+  }
+  else if(phenotype.type == "dichotomous") {
+    # f <- "inst/extdata/dichotomous.stan"
+    f <- system.file("extdata", "dichotomous.stan", package = "genphen")
+    model.stan <- stan_model(file = f, model_name = "dichotomous")
+  }
+}
