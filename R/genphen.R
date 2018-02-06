@@ -48,14 +48,23 @@ runGenphen <- function(genotype = NULL,
   for(s in 1:length(genphen.data)) {
     if(phenotype.type == "continuous") {
       # model.stan <- get(load(file = "inst/extdata/continuous.stan.RData"))
-      model.stan <- get(load(system.file("extdata", "continuous.stan.RData",
-                                         package = "genphen")))
+      # model.stan <- get(load(system.file("extdata", "continuous.stan.RData",
+      #                                    package = "genphen")))
+
       cat("============================================================= \n")
-      cat("Progress: ", round(s/length(genphen.data)*100, digits = 2), "% ",
-          "site = ", genphen.data[[s]]$site, "\n")
+      cat("===================== Compiling Model ======================= \n")
       cat("============================================================= \n")
+      # f <- "inst/extdata/continuous.stan"
+      f <- system.file("extdata", "continuous.stan", package = "genphen")
+      model.stan <- stan_model(file = f, model_name = "continuous")
 
 
+
+      progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
+      cat("============================================================= \n")
+      cat("======== Main Analysis Progress: ", progress.indicator, "% ",
+          "site = ", genphen.data[[s]]$site, "======== \n")
+      cat("============================================================= \n")
       o <- runContinuous(data.list = genphen.data[[s]],
                          mcmc.chains = mcmc.chains,
                          mcmc.iterations = mcmc.iterations,
@@ -69,13 +78,23 @@ runGenphen <- function(genotype = NULL,
     }
     else if(phenotype.type == "dichotomous") {
       # model.stan <- get(load(file = "inst/extdata/dichotomous.stan.RData"))
-      model.stan <- get(load(system.file("extdata", "dichotomous.stan.RData",
-                                         package = "genphen")))
-      cat("============================================================= \n")
-      cat("Progress: ", round(s/length(genphen.data)*100, digits = 2), "% ",
-          "site = ", genphen.data[[s]]$site, "\n")
-      cat("============================================================= \n")
+      # model.stan <- get(load(system.file("extdata", "dichotomous.stan.RData",
+      #                                    package = "genphen")))
 
+      cat("============================================================= \n")
+      cat("===================== Compiling Model ======================= \n")
+      cat("============================================================= \n")
+      # f <- "inst/extdata/dichotomous.stan"
+      f <- system.file("extdata", "dichotomous.stan", package = "genphen")
+      model.stan <- stan_model(file = f, model_name = "dichotomous")
+
+
+
+      progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
+      cat("============================================================= \n")
+      cat("======== Main Analysis Progress: ", progress.indicator, "% ",
+          "site = ", genphen.data[[s]]$site, "======== \n")
+      cat("============================================================= \n")
       o <- runDichotomous(data.list = genphen.data[[s]],
                           mcmc.chains = mcmc.chains,
                           mcmc.iterations = mcmc.iterations,
@@ -89,6 +108,10 @@ runGenphen <- function(genotype = NULL,
     }
 
 
+
+    cat("============================================================= \n")
+    cat("=================== Statistical Learning ==================== \n")
+    cat("============================================================= \n")
     # CA and Kappa
     if(stat.learn.method == "rf") {
       ca <- getRfCa(data.list = genphen.data[[s]],

@@ -4,4 +4,4 @@
 .Ruserdata
 genphen_bioconductor.Rproj
 .Rbuildignore
-tests/
+my.tests/
