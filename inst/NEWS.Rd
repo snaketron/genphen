@@ -1,9 +1,9 @@
 \name{NEWS}
 \title{News for Package 'genphen'}
 
-\section{Changes in genphen version 1.0 (2016-10-01}{
+\section{Changes in genphen version 1.7 (2018-01-20}{
 
-  \subsection{Introduction}{
+  \subsection{Introduction:}{
     \itemize{
       \item Additional functions are added sporadically.
       \item This news file reports changes that have been made as the package
@@ -11,18 +11,21 @@
     }
   }
 
-  \subsection{Changes}{
+  \subsection{Changes:}{
     \itemize{
-      \item Bayesian inference implemented alongside the statistical learning
-      techniques.
+      \item Bayesian inference using stan (rstan package)
+      \item Two bayesian inference methods to support both continuous and
+      dichotomous phenotypes
+      \item Additional genotype-phenotype association metrics added
+      \item Posterior predictive checks implemented
+      \item Tutorial updated
     }
   }
 
-  \subsection{To do}{
+  \subsection{To do:}{
     \itemize{
       \item Add practical examples where genphen has been used.
-      \item Implement multi-core execution.
-      \item Implement genphen for categorical phenotypes.
+      \item Implement modules for data augmentation
     }
   }
 }

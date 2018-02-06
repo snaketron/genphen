@@ -51,6 +51,7 @@
 \setlength\floatsep{1.25\baselineskip plus 3pt minus 2pt}
 \setlength\textfloatsep{1.25\baselineskip plus 3pt minus 2pt}
 \setlength\intextsep{1.25\baselineskip plus 3pt minus 2 pt}
+\setlength{\parindent}{0pt}
 
 \begin{document}
 \SweaveOpts{concordance=TRUE}
@@ -73,93 +74,71 @@ Genome wide association studies (GWAS) have become an important tool to
 understand the association between genotypes and phenotypes. With GWAS we try
 to answer questions such as ``what are the genotypes in the human genome which
 predispose to a disease?'' or ``what are the genotypes in certain strains of
-mice which allow them to be more resistant against a specific virus?''. The are
-countless applications of genotype-phenotype association studies, whereby the
-genotype can either be a set of single nucleotide polymorphisms (SNPs) found in
-nucleotide sequences, or a set of single amino acid polymorphisms (SAAPs) found
-at sites in specific protein sequence. The phenotype can be any measured
-quantity related to the individuals or sequences in which the polymorphic
-genotypes were found.
+mice which confer resistance against a specific virus?''. The advances in high-
+throughput sequencing technology have provided massive genetic data and thus
+potentially countless applications of genotype-phenotype association studies.
+The genotype can be a set of single nucleotide polymorphisms (SNPs) or a set of
+single amino acid polymorphisms (SAAPs) identified in a group of individuals,
+whereas the phenotype can be any continuous or discrete individual quantity or
+characteristics.
 
-To conduct GWAS frequentist statistical methods are typically used, relying on
-P values to report the strength of the association between the genotypes and the
-phenotypes. This often leads to massive multiple hypothesis problems, typically
-answered with stringent P value correction methods, which are used to curb the
-false positives but have the effect of introducing many false negatives. More
+To conduct GWAS, frequentist statistical methods are typically used, relying on
+simple and often inadequate methods to capture the complex and potentially non-
+linear genotype-phenotype association. Moreover, these methods often use P-
+values to quantify the strength of association, bringing with them a set of
+disadvantages, some of which include poor interpretation, difficulty to compare
+between different studies, as well as massive multiple hypothesis problems.
+
+With \texttt{genphen} we provide a hybrid method which rips the benefits of
 sophisticated statistical learning approaches such as random forest (RF) and
-support vector machines (SVM) alleviate the P value problem and are able to
-capture the most complex relationships between the genotypes and phenotypes but
-have the drawback of poor interpretability. Bayesian inference on the other
-hand, provides a solution to both the P value issue and the interpretabilitiy
-of the statistical learning approaches, but comes at a substantially higher
-computational cost.
+support vector machine (SVM) to capture complex genotype-phenotype associations,
+on the one hand, and Bayesian inference on the other hand, to accurately
+quantify the strength of association using models consistent with the data.
+The results of \texttt{genphen} are multiple association scores for each
+genotype. Visualizing these scores in combination presents to the researcher a
+guide to selecting the most promising association.
 
-Here we introduce \texttt{genphen}, a tool for GWAS which implements both
-statistical learning techniques such as RF and SVM as well as Bayesian inference
-using hierarchical models, to quantify the association between genotypes and
-continuous phenotypes. Additionally, \texttt{genphen} implements a set of
-visualization procedures which allow the user to inspect the vast results of
-the main association analyses and pinpoint the significant genotype-phenotype
-associations.
-
-
-\section{Conducting GWAS with \texttt{genphen}}
+\section{Methods}
+\label{sec:methods}
 \subsection{Input}
-Two data types are necessary to perform a genetic association study, namely the
-genotype data and the phenotype data. As an example of genotype data imagine a
-set 1000 SNPs obtained for 10 different strains of laboratory mice taken from
-the Mouse Hapmap Project. The phenotype, on the other hand can be an
-experimental continuous measurement made for each of the 10 different mouse
-strains (e.g. height, body weight, temperature, immune response, etc.)
-(see SNP-Phenotype example in Fig \hyperref[fig:fig1]{1a}).
-
-Another example of a genotype data can be a multiple sequence alignment (MSA)
-of 100 protein homologs (e.g. 120 aligned protein sequences of different
-organisms with 154 protein sites, some of which may contain amino acid
-polymorphisms). The phenotype can once again be continuous measurement made for
-each of the 120 organisms. Similar to the previous example, in this case too we
-can use \texttt{genphen} to estimate the association between the polymorphic
-protein sites and a given phenotype of the organisms.
-
-More specifically, we can think of the genotype data as a character matrix with
-dimensions N$\times$M, whereby the M columns represent different SNPs or SAAPs,
-and the N rows represent different individuals or sequences for which we have
-measures some phenotype. On the other hand, we can think of the phenotype
-as a numerical vector of length N, where each phenotype corresponds to a
-particular individual.
-
-\subsection{Methods}
-The T-test is a popular method which is often used to quantify the association
-between the genotypes and phenotypes. Given a SNP like the one shown in Fig.
-\hyperref[fig:fig1]{1a}, the T-test checks whether there exists a significant
-difference between the two states (alleles) of the SNP w.r.t. the phenotype,
-whereby the strength of the association is summarized with a P value.
-\texttt{genphen} implements three statistical methods which perform similar
-tasks, but are superior to the T-test. These methods can be used through the
-following three interfaces:
+Two data types are necessary to perform a genetic association study:
 \begin{itemize}
-\item runGenphenRf - RF-based analysis
-\item runGenphenSvm - SVM-based analysis
-\item runGenphenBayes - Bayesian inference based analysis
+\item genotype data (e.g. set 1000 SNPs found along the aligned genomes of 10
+individuals)
+\item phenotype data (experimental measurement made for each individual such as
+body mass, immune response, survival, case-control, etc.)
 \end{itemize}
 
-\subsubsection{runGenphenRf and runGenphenSvm}
-The procedures runGenphenRf and runGenphenSvm perform similar tasks using
-different statistical learning techniques, namely RF and SVM. The following
-metrics are estimated using each of them:
+More generally, we can think of the genotype data as a character matrix with
+dimensions $N\times M$, whereby the $M$ columns represent different SNPs or
+SAAPs, and the $N$ rows represent different individuals or sequences for which
+we have measures some phenotype. On the other hand, we can think of the
+phenotype as a numerical vector of length $N$, where each phenotype corresponds
+to a particular individual.
 
+% \subsubsection{Continuous phenotypes}
+% Given a continuous phenotype and a genotype composed of two genetic states
+% (e.g. SNP with two genetic states (e.g. alleles) $x$ and $y$), we want test
+% whether there exists a significant difference in the observed phenotype between
+% the two genetic states, with a null hypothesis $H_0: x - y = 0$ and alternative
+% hypothesis $H_1: = x - y \neq 0$, analogous to a t-test. With \texttt{genphen},
+% we approach this problem as follows:
+
+\subsection{Metrics}
 \paragraph{Classification accuracy($CA$)}
-This metric is used to quantify the strength of the association between each
-specific genotype and the phenotype. Both of the procedures generate
-classification models between the phenotype (a numerical predictor) and a
-specific genotype (a categorical response). If there exists a strong association
-between the genotype and the phenotype, one should be able to build an accurate
-classification model be ($CA = 1$, for a perfect classifier). To obtain a robust
-$CA$ we applied cross-validation, where a subset of the genotype-phenotype data
-is selected at random for training the classifier, followed by testing based on
-the remaining data. The final $CA$ is the mean accuracy of resulting from this
-procedure. The following confusion matrix represents the result of one
-cross-validation step and is the data based on which $CA$ is computed:
+$CA$ measures the degree of accuracy with which one can classify (predict) the
+alleles of an SNP from the phenotype measurements. If there exists a strong
+association between a particular SNP and the phenotype, one should be able to
+build a statistical model which accurately classifies the two alleles of that
+SNP solely from the phenotype data ($CA \approx 1$). Otherwise, the
+classification accuracy of statistical model should be approximately similar to
+that of simple guessing ($CA \approx 0.5$).
+
+To estimate a robust $CA$ estimate, \texttt{genphen} uses cross-validation (CV)
+to estimate a distribution of possible $CAs$. During the CV procedure a subset
+(66\%) of the genotype-phenotype data is selected at random for training the
+classifier, followed by testing based on the remaining data. The following
+confusion matrix represents the result of one CV step:
 \newcommand{\M}{\textmd}
 \newcommand{\B}{$\bullet$}
 \newcommand{\MC}{\multicolumn}
@@ -185,38 +164,33 @@ The CA of the cross-validation step $i$ is then estimated as:
 \begin{gather*}
 CA_i = \frac{a+d}{a+b+c+d}
 \end{gather*}
-The final $CA$ for $N$ cross-validation steps is then estimated as:
+The final $CA$ after 1000 CV steps is then estimated as:
 \begin{gather*}
-CA = \frac{1}{N} \sum_{i=1}^{N} CA_{i}
+CA = \frac{1}{1000} \sum_{i=1}^{1000} CA_{i}
 \end{gather*}
-In addition to estimating $CA$, one can also compute the 95\% highest density
-interval (95\% HDI) from the  distribution of the individual $CA$s obtained
-throughout the cross-validation. In order to obtain reliable HDIs, the user
-should run these procedures with at least a hundred cross-validation steps
-(parameter nboots > 100). Those genotypes for which a $CA$ is close to 1,
-coupled with a narrow CI, have the most significant association with the
-phenotype.
+In addition to estimating $CA$, the distribution of $CAs$ enables us to also
+compute the 95\% highest density interval (95\% HDI) of CA. The mutations with
+$CA \approx 1$, with narrow HDI of CA are the most promising ones.
 
-The metric $CA$ has two advantages over the P values. First, it is more
-intuitive that a P value as a $CA=0.9$ means that on average, one is able to
-correctly predict 90\% of the states of the genotype from the phenotypes.
-Second, we do not run into multiple hypothesis problems and therefore there is
-no need for a P value correction. One drawback of $CA$ is that it is difficult
-to find a ``perfect'' cuttoff to separate the strong associations from the weak
-ones.
+The metric $CA$ has the following advantages:
+\begin{itemize}
+\item simple to estimate
+\item simple to interpret (bound between 0 and 1)
+\item simple to compare across studies
+\item one can have high CA even for small effects
+\end{itemize}
 
-\paragraph{Cohen's $\kappa$ statistics}
-Often we are interested in comparing the observed $CA$ with classification
-accuracy which is expected simply by chance ($CA_{exp}$). This is in particular
-useful when the genetic states of the genotype are not evenly represented, i.e.
-allele A of a given SNP may be represented in 80\% of the individuals, while
-the other allele T may be represented in only 20\% of the individuals. Such
-uneven composition of the genotype can affect the classification analysis,
-resulting in high $CA$s simply because the classifier only predicts the
-dominant label. Cohen's $\kappa$ statistics can be used to estimate how much
-stronger the observed $CA$ is, compared to $CA_{exp}$. To compute the $\kappa$
-statistics, the confusion matrix shown before in Table \hyperref[tab:t0]{1} is
-used:
+\paragraph{Cohen's $\kappa$ statistic}
+There is one pitfall where the $CA$ estimate can be truly misleading, and this
+is the case when the analyzed SNP is composed of unevenly represented genetic
+states (alleles). For instance, the allele A of a given SNP is found in 90\%
+of the individuals, while the other allele T in only 10\%. Such an uneven
+composition of the alleles can lead to misleading results, i.e. even without
+learning the algorithm can produce a high $CA \approx 0.9$ simply by constantly
+predicting only the dominant label. The Cohen's $\kappa$ statistics can be used
+to estimate how much better the observed $CA$ is, compared to the classification
+accuracy expected by chance ($CA_{exp}$). To compute the $\kappa$ statistics,
+the confusion matrix shown before in Table \hyperref[tab:t0]{1} is used:
 \begin{gather*}
 \kappa =  \frac{CA - CA_{exp}}
 {1 - CA_{exp}} \\
@@ -229,20 +203,17 @@ $CA$. Cohen defines the following meaningful $\kappa$ intervals: [$\kappa$<0]:
 , [0.4-0.6]: ``moderate agreement'', [0.6-0.8]: ``substantial agreement'' and
 [0.8-1.0]: ``almost perfect agreement''. Similarly to the estimation of $CA$,
 the final Cohen's $\kappa$ is also estimated by averaging the individual
-$\kappa$s computed for each step of the cross-validation. Here too, highest
-density intervals are estimated.
+$\kappa$ scores computed for each step of the CV. Here too,
+95\% HDIs are estimated.
 
-
-
-\paragraph{Cohen's effect size ($d$)}
-Using the package \texttt{effsize}, we compute the Cohen's $d$ for each
-genotype-phenotype pair. High Cohen's $d$ estimations indicate that there is
-a large difference in the measured phenotype between the two genetic states of
-the specific genotype. Cohen (1992) defines thresholds which define the
-magnitude of the effects as: |$d$|<0.2 ``negligible'', |$d$|<0.5 ``small'',
-|$d$|<0.8 ``medium'', otherwise ``large''. \texttt{genphen} computes both the
-Cohen's $d$ statistics and the corresponding 95\% confidence intervals. The
-Cohen's $d$ is computed as follows:
+\paragraph{Cohen's $d$ effect size}
+For continuous phenotypes we compute the Cohen's $d$ for each genotype-phenotype
+pair. Cohen's $d$ estimates which are significantly greater or smaller than 0,
+indicate that there is a large difference in the measured phenotype between the
+two genetic states of the specific genotype. Cohen (1992) defines thresholds
+which define the magnitude of the effects as: |$d$|<0.2 ``negligible'',
+|$d$|<0.5 ``small'', |$d$|<0.8 ``medium'', otherwise ``large''. The Cohen's $d$
+is computed as follows:
 \begin{gather*}
 d = \frac{\mu_1 - \mu_2}{\sqrt{\frac{(n_1 - 1) * \sigma_1 +
 (n_2 - 1) * \sigma_2}{n_1 + n_2 - 2}}}
@@ -252,444 +223,318 @@ standard deviations of the phenotypes in the two genetic states of the genotype,
 while $n_1$ and $n_2$ represent the sample sizes of the two genetic states of
 the genotype.
 
-Both runGenphenRf and runGenphenSvm estimate the three metrics $CA$, $\kappa$
-and $d$ with their corresponding highest density intervals, and with that
-provide an alternative approach for GWAS.
+\texttt{genphen} uses the following Bayesian inference models designed in STAN
+\footnote{Stan Development Team. 2017. Stan Modeling Language Users Guide and
+Reference Manual, Version 2.17.0. http://mc-stan.org}, to estimate each of the
+parameters in the Cohen's $d$ equation from the data:
+\begin{gather*}
+Y_{ij} \sim T(\nu, \mu_{j}, \sigma_{j}) \\
+\mu_{j} \sim N(\hat{\mu}_{j}, \hat{\sigma}_{j}) \\
+\sigma_{j} \sim U(\hat{\sigma}_{j}/100, \hat{\sigma}_{j}*100) \\
+\nu \sim Gamma(2.0, 0.1)
+\end{gather*}
+where $i$ and $j$ index the different observations and alleles of a given SNP,
+respectively. $Y$ is the phenotype vector; $\mu$, $\sigma$ and $\nu$ are the
+mean, standard deviation and degrees of freedom parameters of the T-distribution
+which is used to model the phenotype observed in each allele; $\hat{\sigma}$ and
+$\hat{\mu}$ are the empirically estimated mean and standard deviations of the
+phenotype in each allele which are used to setup the broad priors for $\mu$ and
+$\sigma$.
 
+For each parameter we estimate a complete posterior distribution with MCMC
+sampling implemented in \texttt{rstan}. Therefore, by plugging in the entire
+posterior distributions of the parameters into the Cohen's $d$ equation, we
+estimate a complete posterior distribution for $d$ as well. This also allows us
+to compute the corresponding 95\% HDI of $d$. A complete description of the
+hierarchical model is provided in Krushke, 2013) \footnote{Kruschke, John K.
+"Bayesian estimation supersedes the t test."Journal of Experimental Psychology:
+General 142.2 (2013): 573}.
 
-\subsubsection{runGenphenBayes}
-The procedure runGenphenBayes employes Bayesian inference to quantify the
-association between genotypes and phenotypes. It performs Bayesian T-test
-(Kruschke, 2014), using hierarchical models. The results of this procedure are
-the most probable estimates (posterior estimates) for the parameters $\mu_1$
-and $\mu_2$ which represent the mean phenotypes in each group of a given
-genotype, as well as the standard deviations $\sigma_1$ and $\sigma_2$. While
-the classical T-test has to adhere to two assumptions, namely: 1) the phenotypes
-should be normally distributed in each group and 2) the variances in the two
-groups should be equal; the Bayesian hierarchical models have been designed
-such that both of these assumptions are relaxed. Using the posterior estimates
-for $\mu_1$ and $\mu_2$ for a given genotype-phenotype combination, one can
-estimate the contrast $\mu_1 - \mu_2$ and the so-called highest density
-interval (HDI) to evaluate whether there exists a significant phenotypic
-effect between the two groups which excludes the null-effect.
+\paragraph{Absolute effect size ($a$)}
+For dichotomous phenotypes, \texttt{genphen} simply computes the absolute
+difference (also known as contrast $a$) between the phenotypes of any two
+genetic states of each polymorphism as follows:
+\begin{gather*}
+a = p_1 - p_2
+\end{gather*}
+where $p_1$, $p_2$ represent the proportion of "successes" in a given number of
+observed trials in the two genetic states of the given SNP/SAAP. Similar to the
+case of having a continuous phenotype, \texttt{genphen} uses a Bayesian
+inference models designed in STAN to estimate each of the parameters in the
+equation above from the data:
+\begin{gather*}
+Y_{ij} \sim Bern(p_{j}) \\
+p_{j} \sim Beta(1/2, 1/2)
+\end{gather*}
+where $i$ and $j$ index the different observations and alleles of a given SNP,
+respectively. $Y$ is the phenotype vector; $p$, is the probability parameter of
+the Bernoulli distribution which is used to model the dichotomous phenotype data
+as a set of sucesses in a set of trials observed each allele; The prior of $p$
+is a Beta distribution whose two shape parameters are fixed at 0.5 (Jeffrey's
+prior).
 
-Using runGenphenBayes and analysing genotype-phenotype association based on the
-Bayesian effect size $\mu_1 - \mu_2$ and the corresponding HDI has multiple
-advantages:
-\begin{itemize}
-\item the effect size is easy to interpret
-\item it helps avoid the multiple hypothesis problem
-\item the HDI of the effect size provides a convenient filtering technique with
-which the associations can be classified as either reliable (the HDI excludes
-the null-effect) or unreliable (the HDI spans the null-effect)
-\item the Bayesian hierarchical models relax the assumptions of the classical
-T-test, and employ prior which model more accurately the observed data
-\end{itemize}
-The only disadvantage of applying this method genome-wide is its computational
-complexity.
+Plugging in the estimated posterior distributions of $p$ into the equation above
+allows us to compute the mean $a$ point estimate and its 95\% HDI.
 
+\section{Case studies}
+\subsection{Case study I: Association between SNPs and a *continuous*
+phenotype}
+\label{sec:case1}
 
+In the first case study, we show a typical genotype-phenotype analysis, whereby
+the genotype is a protein sequence alignment composed of 6 sites and 120
+individuals (sequences), and a continuous phenotype measured for each of the
+individuals.
 
+<<echo=F, include=T, results=hide>>=
+require(genphen)
+require(ggplot2)
+require(knitr)
+require(ggrepel)
+require(reshape2)
 
-
-
-\subsection{Case studies}
-\subsubsection{SNP-phenotype association with \texttt{genphen}}
-This example is intended to guide the user through the previously described
-\texttt{genphen} methodology. In particular, we present a situation in which
-the association is to be computed between SNPs and phenotypes. We use a simple
-example shown in Fig \hyperref[fig:fig1]{1a} to explain the \texttt{genphen}
-procedures runGenphenRf/runGenphenSvm and runGenphenBayes.
-
-\begin{itemize}
-\item Input:
-\begin{itemize}
-\item genotype: a SNP column vector of 14 elements, where the two alleles A
-and T are contained with 5 and 9 elements, respectively. The 14 elements of
-this vector represent 14 mouse species.
-\item phenotype: a vector of 14 elements, where each element represents the
-measured immune response of a specific mouse.
-\item Hint: we can inspect the given genotype-phenotype pair using the
-procedure \texttt{plotSpecificGenotype} whose results are shown in Fig.
-\hyperref[fig:fig1]{1b}.
-\end{itemize}
-
-\item Goal: can we quantify the association between the genotype and the
-phenotype vectors using \texttt{genphen}?
-\item Methods: we use the procedures runGenphenRf/runGenphenSvm and
-runGenphenBayes to compute the association.
-\end{itemize}
-
-\begin{figure}[ht]
-\centering
-\includegraphics[width=12cm]{fig1.pdf}
-\caption{\textbf{a}, genotype-phenotype data pair. The genotype is a SNP with
-two genetic states (alleles A and T), found in 14 individuals. \textbf{b},
-boxplot showing the phenotypic distribution of the genotype as a function of the
-two alleles.}
-\label{fig:fig1}
-\end{figure}
-
-\paragraph{runGenphenSvm and runGenphenRf}
-<<sectionTag>>=
-library(genphen)
-genotype <- c("A", "A", "A", "T", "T", "T", "T", "T", "T",
-              "T", "T", "T", "A", "A")
-
-phenotype <- c(6.14, 3.95, 6.19, 8.02, 8.07, 7.32, 7.28,
-               7.10, 7.10, 8.26, 8.38, 7.48, 5.22, 5.60)
-@
-
-<<sectionTag>>=
-result <- runGenphenSvm(genotype = genotype,
-                        phenotype = phenotype,
-                        cv.fold = 0.66,
-                        cv.steps = 1000,
-                        hdi.level = 0.95)
-@
-
-\begin{table}[H] \centering
-\begin{tabular}{@{\extracolsep{-4pt}} ccccccccc}
-\hline
-site & g.1 & g.2 & count.1 & count.2 & $d$ & $CA$ & $\kappa$ & t.test.pvalue \\
-\hline \\[-1.8ex]
-1 & A & T & $5$ & $9$ & $$-$3.339$ & $0.960$ & $0.918$ & $0.003$ \\
-\hline
-\end{tabular}
-\caption{Results of the runGenphenSvm procedure (HDIs have been left out)}
-\label{runGenphenSvm}
-\end{table}
-
-In Fig. \hyperref[fig:fig1]{1b} we notice that the two states of the genotype
-are associated with divergent distributions of the phenotype. Hence, we can
-expect a significant association between the SNP and the phenotype. This is
-confirmed by the results of the procedure runGenphenSvm, which yield $CA$ close
-to 1 ($CA = 0.960$), high Cohen's $\kappa$ ($\kappa = 0.918$) and a substantial
-Cohen's effect size ($d = -3.339$). Similar results can be obtained with the
-alternative statistical method (RF).
-
-
-\paragraph{runGenphenBayes}
-<<sectionTag>>=
-result <- runGenphenBayes(genotype = genotype,
-                          phenotype = phenotype,
-                          chain.nr = 2,
-                          mcmc.iter = 1000,
-                          model = "tdist",
-                          hdi.levels = 0.95)
-@
-\begin{table}[H] \centering
-\begin{tabular}{@{\extracolsep{-4pt}} ccccccccccc}
-\hline
-site & g.1 & g.2 & count.1 & count.2 & mu.1 & mu.2 & effect & effect.0.95.HDI \\
-\hline \\[-1.8ex]
-1 & A & T & $5$ & $9$ & $5.460$ & $7.662$&$$-$2.202$&($$-$3.771$,$$-$0.757$) \\
-\hline
-\end{tabular}
-\caption{Results of the runGenphenBayes procedure}
-\label{runGenphenBayes}
-\end{table}
-
-The results of runGenphenBayes confirm the previous claims about the association
-between the SNP and the phenotype. The state A is associatied with a mean
-phenotype of 5.460, while T is associated with 7.662. The Bayesian effect size
-therefore equals to -2.202 with 95\% HDI of (-3.771, -0.757), which excludes the
-null-effect. The HDI criterion is an intuitive quality measure which can be used
-to filter out poor association. In contrast to this, the filtering is not as
-intuitive based on $CA$ and $\kappa$ in the case of the statistical learning
-procedures.
-
-
-
-
-\subsubsection{SAAP-phenotype association with \texttt{genphen}}
-This example is intended to guide the user through the previously described
-\texttt{genphen} methodology, this time when the association is to be computed
-between a SAAP and a phenotype.
-
-
-\begin{itemize}
-\item Input:
-\begin{itemize}
-\item genotype: a SAAP column vector of 120 elements, where the four amino
-acid states are present H, Q, N and K with the following counts 62, 55, 2 and
-1, respectively. This genotype vector is a single site taken from the protein
-sequence of 120 organisms, therefore each amino acid state corresponds to a
-specific organism.
-\item phenotype: a vector of 120 numerical elements (artificially generated).
-\item Hint: we can first inspect the genotype-phenotype pair using the
-procedure \texttt{plotSpecificGenotype} whose results are shown in Fig
-\hyperref[fig:fig2]{2}.
-\end{itemize}
-
-\item Goal: can we quantify the association between the genotype and the
-phenotype vectors using \texttt{genphen}?
-
-\item Method: we can use the \texttt{genphen} method \texttt{runGenphen}
-to compute the association. This procedure will first need to decompose the
-genotype-phenotype pair into the 6 possible amino acid substitution pairs,
-namely (H, Q), (H, K), (H, N), (Q, K), (Q, N) and (K, N), and then compute
-the association between substitution pair and the phenotype just as it was
-presented in the previous example.
-\end{itemize}
-
-\begin{figure}[ht]
-\centering
-\includegraphics[width=8cm]{fig2.pdf}
-\caption{Boxplot showing the phenotypic distribution as a function of four
-amino acids (H, Q, N, K) at a given SAAP of 120 amino acids in total.}
-\label{fig:fig2}
-\end{figure}
-
-
-
-
-\paragraph{runGenphenSvm and runGenphenRf}
-<<sectionTag>>=
-library(genphen)
+# genotype inputs:
 data(genotype.saap)
+# phenotype inputs:
 data(phenotype.saap)
 
-genotype <- genotype.saap[, 82]
-phenotype <- phenotype.saap
+# run genphen
+c.out <- runGenphen(genotype = genotype.saap[, 80:85],
+                    phenotype = phenotype.saap,
+                    phenotype.type = "continuous",
+                    mcmc.chains = 2,
+                    mcmc.iterations = 2000,
+                    mcmc.warmup = 500,
+                    mcmc.cores = 2,
+                    hdi.level = 0.95,
+                    with.ppc = TRUE,
+                    stat.learn.method = "rf")
 @
 
-<<sectionTag>>=
-result <- runGenphenSvm(genotype = genotype,
-                        phenotype = phenotype,
-                        cv.fold = 0.66,
-                        cv.steps = 1000,
-                        hdi.level = 0.95)
+First we show an overview of the distribution of the phenotype across each of
+the 6 studied polymorphic sites in the sequence alignment, and the underlying
+genotype states. \texttt{genphen} will list the mutations found at each size,
+followed by quantification fo the association strength as explained in
+\ref{sec:methods}.
+
+\begin{figure}[H]
+\centering
+<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
+df <- data.frame(genotype.saap[, 80:85], stringsAsFactors = F)
+df$phenotype <- phenotype.saap
+df <- melt(data = df, id.vars = "phenotype")
+colnames(df) <- c("phenotype", "site", "genotype")
+df$site <- gsub(pattern = "X", replacement = '', x = df$site)
+
+ggplot(data = df)+
+  facet_wrap(facets = ~site, ncol = 6, scales = "free_x")+
+  geom_violin(aes(x = genotype, y = phenotype))+
+  geom_point(aes(x = genotype, y = phenotype, col = genotype), size = 1,
+             shape = 21, position = position_jitterdodge(jitter.width = 0.2,
+                                                         jitter.height = 0.1,
+                                                         dodge.width = 0.5))+
+  scale_color_discrete(name = "genotype")+
+  theme_bw(base_size = 16)+
+  theme(legend.position="none")
 @
+\end{figure}
 
-\begin{table}[H] \centering
-\begin{tabular}{@{\extracolsep{-4pt}} ccccccccc}
-\hline
-site & g.1 & g.2 & count.1 & count.2 & $d$ & $CA$ & $\kappa$ & t.test.pvalue \\
-\hline \\[-1.8ex]
-1 & H & Q & $62$ & $55$ & $2.381$ & $0.879$ & $0.755$ & $0$ \\
-1 & H & K & $62$ & $1$ & $NA$ & $NA$ & $NA$ & $NA$ \\
-1 & H & N & $62$ & $2$ & $2.339$ & $0.974$ & $$-$0.0001$ & $0.221$ \\
-1 & Q & K & $55$ & $1$ & $NA$ & $NA$ & $NA$ & $NA$ \\
-1 & Q & N & $55$ & $2$ & $$-$0.102$ & $0.973$ & $0$ & $0.934$ \\
-1 & K & N & $1$ & $2$ & $NA$ & $NA$ & $NA$ & $NA$ \\
-\hline
-\end{tabular}
-\caption{Results of the runGenphenSvm procedure (HDIs have been left out)}
-\label{runGenphenSvm}
-\end{table}
+A typical way of visualizing the \texttt{genphen} results is with the following
+plot where each point represents a polymorphism (here SAAP) plotted according
+to x=classification accuracy ($CA$), y=Cohen's $d$, color=Cohen's $\kappa$. The
+most promising SAAPs have CA and $\kappa$ close to 1, with Cohen's $d$ estimate
+whose 95\% highest density interval (HDI) does not overlap with the null effect
+(dashed line in figure: $d = 0$). The labels indicate the MSA site number,
+followed by the type of the polymorphism.
 
-For each SAAP (amino acid substitution), runGenphenSvm and runGenphenRf
-estimates the previously defined metrics w.r.t. the phenotype. One can then use
-the $CA$, Cohen's $\kappa$ and Cohen's effect size $d$, to find the most
-significant associations. The SAAP involving the amino acid (H, Q) stands out
-in this example not only due to its high $CA$, $\kappa$ and $d$, but also
-because these estimates are based on substantial data of 62 + 55 data points.
-If only a single data point is available for a given genetic state of a SAAP
-(e.g. amino acid state K), then NA (not available) estimates are returned.
-
-\paragraph{runGenphenBayes}
-<<sectionTag>>=
-result <- runGenphenBayes(genotype = genotype,
-                          phenotype = phenotype,
-                          chain.nr = 2,
-                          mcmc.iter = 1000,
-                          model = "tdist",
-                          hdi.levels = 0.95)
+\begin{figure}[H]
+\centering
+<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
+c.out$scores$label <- paste(c.out$scores$site, c.out$scores$mutation, sep = ':')
+ggplot(data = c.out$scores)+
+  geom_errorbar(aes(x = ca, ymin = cohens.d.L, ymax = cohens.d.H))+
+  geom_point(aes(x = ca, y = cohens.d, fill = kappa), shape = 21, size = 4)+
+  scale_fill_gradientn(colours = terrain.colors(10), limits = c(0, 1))+
+  geom_text_repel(aes(x = ca, y = cohens.d, label = label), size = 4)+
+  theme_bw(base_size = 16)+
+  xlab(label = "CA")+
+  ylab(label = "Cohen's d (with 95% HDI)")+
+  scale_x_continuous(limits = c(0, 1))+
+  geom_hline(yintercept = 0, linetype = "dashed")
 @
-\begin{table}[H] \centering
-\begin{tabular}{@{\extracolsep{-4pt}} ccccccccccc}
-\hline
-site & g.1 & g.2 & count.1 & count.2 & mu.1 & mu.2 & effect & effect.0.95.HDI \\
-\hline \\[-1.8ex]
-1 & H & Q & $62$ & $55$ & $2.285$ & $$-$0.514$ & $2.798$ & ($2.355$, $3.219$) \\
-1 & H & K & $62$ & $1$ & $NA$ & $NA$ & $NA$ & ($NA$, $NA$) \\
-1 & H & N & $62$ & $2$ & $2.286$ & $$-$0.575$ & $2.861$&($$-$6.145$, $12.663$)\\
-1 & Q & K & $55$ & $1$ & $NA$ & $NA$ & $NA$ & ($NA$, $NA$) \\
-1 & Q & N & $55$ & $2$ & $$-$0.513$ & $$-$0.604$&$0.091$&($$-$8.121$, $8.140$)\\
-1 & K & N & $1$ & $2$ & $NA$ & $NA$ & $NA$ & ($NA$, $NA$) \\
-\hline
-\end{tabular}
-\caption{Results of the runGenphenBayes procedure}
-\label{runGenphenBayes}
-\end{table}
-The results of runGenphenBayes once again confirm the previous claims about the
-association between the different SAAPs and the phenotype. The amino acid state
-H is  associatied with a mean phenotype of 2.285, while Q is associated with
--0.514. The Bayesian effect size therefore equals to 2.798 with 95\% HDI of
-(2.355, 3.219), which excludes the null-effect. None of the other associations
-satisfies this criterion.
+\end{figure}
 
-
-
-
-\subsection{Visualization}
-The tool \texttt{genphen} implements visualization procedures which help the
-user evaluate its results. Here we introduce the following four procedures:
+Next, we want to check the validity our Bayesian inference model by inspecting
+the two \texttt{genphen} outputs, namely the outputs named convergence and ppc.
 \begin{itemize}
-\item plotSpecificGenotype
-\item plotGenphenRfSvm
-\item plotGenphenBayes
-\item plotManhattan
+\item convergence - the convergence output contains information the markov chain
+monte carlo (MCMC) simulation done with R package rstan such as potential scale
+reduction factor (Rhat) or effective sampling size (ESS), including potential
+convergence issues (divergences, tree depth exceeded warnings, etc.) provided
+by the rstan package. Small sample size of specific alleles (of a site) are
+often the cause of such warnings, which are then reported for the the alleles
+of that site.
+
+<<echo=F, include=T>>=
+kable(c.out$convergence[, 1:7], align = "c", digits = 2)
+@
+
+<<echo=F, include=T>>=
+kable(c.out$convergence[, c(1:3, 8:9)], align = "c", digits = 2)
+@
+
+\item ppc - the posterior predictive check (ppc) output, tests the validity of
+the model by inspecting its parameters using the following procedure: 1) we use
+the estimated posterior distribution of each parameter (parameters describing
+the distribution of the phenotype associated with a given allele of a SNP) to
+simulate new data; 2) therefore, we obtain a distribution of simulated data
+points which we can compare with the observed (real) distribution. If the model
+is suitable, the two distributions should have a high overlap, else our model
+is not suitable. There are two approaches test this: a) we can visualize the
+distribution of the simulated and real phenotype and check whether they
+overlap each other; b) we quantify the overlap between the distribution of the
+simulated and real phenotype using the Bhattacharyya coefficient (BC)
+\footnote{\url{https://en.wikipedia.org/wiki/Bhattacharyya_distance}}, with
+$BC = 0$ representing no overlap and $BC = 1$ a complete overlap. Both are
+shown in the figure below.
+
+\begin{figure}[H]
+\centering
+<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
+ppc <- c.out$ppc
+ggplot(data = ppc)+
+  facet_wrap(facets = ~site, scales = "free_x")+
+  geom_errorbar(aes(x = g.i,ymin = sim.mu.L,ymax = sim.mu.H), col = "blue")+
+  geom_errorbar(aes(x = g.i,ymin = real.mu.L,ymax = real.mu.H),
+                col = "orange", linetype = "dotdash")+
+  geom_point(aes(x = g.i, y = sim.mu), col = "blue")+
+  geom_point(aes(x = g.i, y = real.mu), col = "orange")+
+  geom_text(aes(x = g.i, y = sim.mu.H + 0.1,
+                label = round(x = b.coef, digits = 2)))+
+  theme_bw(base_size = 16)+
+  xlab(label = "Genotypes")+
+  ylab(label = "Phenotype (with 95% HDI)")+
+  ggtitle(label = "Posterior predictive check: orange = real, blue = ppc")
+@
+\end{figure}
 \end{itemize}
 
-\paragraph{plotSpecificGenotype}
-The results of the procedure \texttt{plotGenphenResults} are shown in
-Fig \hyperref[fig:fig3]{3}. With it, one can plot the phenotype as a function
-of a specific genotype, in which the user might be interested (e.g. specific
-SNP).
+\subsection{Case study II: Association between SNPs and a *dichotomous*
+phenotype}
+\label{sec:case2}
 
-\paragraph{plotGenphenRfSvm}
-The results generated either by runGenphenRf and runGenphenSvm can be inspected
-via this procedure. With it one visualizes the quantified genotype-phenotype
-associations with respect to their $CA$ and $d$ measures.
+In the second case study we show you how to use \texttt{genphen} in case the
+phenotype is of dichotomous type. The genotype input is a protein sequence
+alignment composed of 12 sites and 120 individuals (sequences), and the
+phenotype is a vector of 120 dichotomous values measured for each individual.
 
-\paragraph{plotGenphenBayes}
-The results generated by plotGenphenBayes can be inspected via this procedure.
-With it one visualizes the quantified genotype-phenotype associations with
-respect to their Bayesian effect sizes $\mu_1 - \mu_2$ and the corresponding
-HDIs.
-
-\paragraph{plotManhattan}
-The -log10 transformed P values estimated via the two-sample T-test for each
-genotype-phenotype association can be inspected via this procedure using via a
-Manhattan plot.
-
-All four plotting procedures are applied in the following section
-\ref{sec:example}.
-
-
-
-
-\section{Complete worked example}
-\label{sec:example}
-
-\subsection{Workflow 1}
-\begin{enumerate}
-\item Loading data
-<<sectionTag>>=
-library(genphen)
+<<echo=F, include=T, results=hide>>=
+# genotype inputs:
 data(genotype.saap)
-# One can also use a multiple sequence alignment as a genotype input (in the
-# form of either a DNAMultipleAlignment or AAMultipleAlignment objects of the
-# Biostring package).
-data(phenotype.saap)
+# phenotype inputs:
+data(dichotomous.phenotype.saap)
+
+# run genphen
+d.out <- runGenphen(genotype = genotype.saap[, 68:79],
+                    phenotype = dichotomous.phenotype.saap,
+                    phenotype.type = "dichotomous",
+                    mcmc.chains = 2,
+                    mcmc.iterations = 2000,
+                    mcmc.warmup = 500,
+                    mcmc.cores = 2,
+                    hdi.level = 0.95,
+                    with.ppc = TRUE,
+                    stat.learn.method = "rf")
 @
 
-
-
-
-
-\item Running genphen algorithm using random forests (RF) and linear support
-vector machines (LSVM):
-<<sectionTag>>=
-# if DNAMultipleAlignment is loaded you cannot subset
-# with genotype.snp[, 1:10]
-genphen.rf <- runGenphenRf(genotype = genotype.saap[, 1:10],
-                           phenotype = phenotype.saap,
-                           cv.fold = 0.66,
-                           cv.steps = 100,
-                           hdi.level = 0.99,
-                           ntree = 1000)
-
-
-genphen.svm <- runGenphenSvm(genotype = genotype.saap[, 1:10],
-                             phenotype = phenotype.saap,
-                             cv.fold = 0.66,
-                             cv.steps = 100,
-                             hdi.level = 0.99)
-@
-
-
-\item Filtering out association which could not be quantified by
-\texttt{genphen}, due to lack of data:
-<<sectionTag>>=
-genphen.rf <- genphen.rf[complete.cases(genphen.rf), ]
-genphen.svm <- genphen.svm[complete.cases(genphen.svm), ]
-@
-
-
-\item Plotting results
-\begin{figure}[H]
-\centering
-<<fig=true, echo = FALSE, width=7, height=5>>=
-plotGenphenRfSvm(genphen.results = genphen.rf)
-@
-\caption{Effect site - classification accuracy plot}
-\end{figure}
-
+First we show an overview of the distribution of the phenotype across each of
+the 12 studied polymorphic sites in the sequence alignment, and the underlying
+genotype states. \texttt{genphen} will list the mutations found at each size,
+followed by quantification fo the association strength as explained in
+\ref{sec:methods}.
 
 \begin{figure}[H]
 \centering
-<<fig=true, echo = FALSE, width=7, height=5>>=
-plotGenphenRfSvm(genphen.results = genphen.svm)
+<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
+df <- data.frame(genotype.saap[, 68:79], stringsAsFactors = F)
+df$phenotype <- dichotomous.phenotype.saap
+df <- melt(data = df, id.vars = "phenotype")
+colnames(df) <- c("phenotype", "site", "genotype")
+df$site <- gsub(pattern = "X", replacement = '', x = df$site)
+
+ggplot(data = df)+
+  facet_wrap(facets = ~site, ncol = 6, scales = "free_x")+
+  geom_point(aes(x = genotype, y = phenotype, col = genotype), size = 1,
+             shape = 21, position = position_jitterdodge(jitter.width = 0.2,
+                                                         jitter.height = 0.1,
+                                                         dodge.width = 0.5))+
+  scale_color_discrete(name = "genotype")+
+  theme_bw(base_size = 16)+
+  theme(legend.position="none")
 @
-\caption{Effect site - classification accuracy plot}
 \end{figure}
 
-
-
+A typical way of visualizing the \texttt{genphen} results is with the following
+plot where each point represents a polymorphism (here SAAP) plotted according
+to x=classification accuracy ($CA$), y=absolute $d$ (with error bars 95\% HDI),
+color=Cohen's $\kappa$. The most promising SAAPs have CA and $\kappa \approx 1$,
+with absolute $d$ estimate whose 95\% highest density interval (HDI) does not
+overlap with the null effect ($d \neq 0$). The labels indicate the MSA site
+number, followed by the type of the polymorphism.
 
 \begin{figure}[H]
 \centering
-<<fig=true, echo = FALSE, width=7, height=5>>=
-plotManhattan(genphen.results = genphen.rf)
+<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
+d.out$scores$label <- paste(d.out$scores$site, d.out$scores$mutation, sep = ':')
+ggplot(data = d.out$scores)+
+  geom_errorbar(aes(x = ca, ymin = absolute.d.L, ymax = absolute.d.H))+
+  geom_point(aes(x = ca, y = absolute.d, fill = kappa), shape = 21, size = 4)+
+  scale_fill_gradientn(colours = terrain.colors(10), limits = c(0, 1))+
+  geom_text_repel(aes(x = ca, y = absolute.d, label = label), size = 4)+
+  theme_bw(base_size = 16)+
+  xlab(label = "CA")+
+    ylab(label = "Absolute d (with 95% HDI)")+
+  scale_x_continuous(limits = c(0, 1))+
+  geom_hline(yintercept = 0, linetype = "dashed")
 @
-\caption{Manhattan plot}
 \end{figure}
 
+Next, we want to check the validity our Bayesian inference model by inspecting
+the two \texttt{genphen} outputs, namely the outputs named convergence and ppc.
+A similar analysis was performed and described in \ref{sec:case1}.
+\begin{itemize}
+\item convergence
 
-\item Running the genphen algorithm using Bayesian inference:
-<<sectionTag>>=
-# if DNAMultipleAlignment is loaded you cannot subset
-# with genotype.snp[, 1:10]
-genphen.bayes <- runGenphenBayes(genotype = genotype.saap[, 1:10],
-                                 phenotype = phenotype.saap,
-                                 chain.nr = 2,
-                                 mcmc.iter = 1000,
-                                 model = "tdist",
-                                 hdi.levels = c(0.90, 0.95, 0.99))
+<<echo=F, include=T>>=
+kable(d.out$convergence[, 1:7], align = "c", digits = 2)
 @
 
-
-\item Filtering out association which could not be quantified by
-\texttt{genphen}, due to lack of data:
-<<sectionTag>>=
-genphen.bayes <- genphen.bayes[complete.cases(genphen.bayes), ]
+<<echo=F, include=T>>=
+kable(d.out$convergence[, c(1:3, 6:7)], align = "c", digits = 2)
 @
 
-
-\item Plotting results
-\begin{figure}[H]
-\centering
-<<fig=true, echo = FALSE, width=7, height=5>>=
-plotGenphenBayes(genphen.results = genphen.bayes, hdi = 0.9)
-@
-\caption{Effect site - Bayesian effect size plot}
-\end{figure}
-
+\item ppc
 
 \begin{figure}[H]
 \centering
-<<fig=true, echo = FALSE, width=7, height=5>>=
-plotManhattan(genphen.results = genphen.bayes)
+<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
+ppc <- d.out$ppc
+ggplot(data = ppc)+
+  facet_wrap(facets = ~site, scales = "free_x")+
+  geom_errorbar(aes(x = g.i,ymin = sim.mu.L,ymax = sim.mu.H), col = "blue")+
+  geom_errorbar(aes(x = g.i,ymin = real.mu.L,ymax = real.mu.H),
+                col = "orange", linetype = "dotdash")+
+  geom_point(aes(x = g.i, y = sim.mu), col = "blue")+
+  geom_point(aes(x = g.i, y = real.mu), col = "orange")+
+  geom_text(aes(x = g.i, y = sim.mu.H + 0.1,
+                label = round(x = b.coef, digits = 2)))+
+  theme_bw(base_size = 16)+
+  xlab(label = "Genotypes")+
+  ylab(label = "Phenotype (error bars = 95% HDI)")+
+  ggtitle(label = "Posterior predictive check: orange = real, blue = ppc")
 @
-\caption{Manhattan plot}
 \end{figure}
-
-
-\item Visual inspection of the association between a specific genotypes and
-the phenotypes:
-\begin{figure}[H]
-\centering
-<<fig=true, echo = FALSE, height=2.5>>=
-plotSpecificGenotype(genotype = genotype.saap,
-                     phenotype = phenotype.saap,
-                     index = 9)
-@
-\caption{Specific genotype-phenotype plot}
-\end{figure}
-\end{enumerate}
+\end{itemize}
 
 
 \end{document}

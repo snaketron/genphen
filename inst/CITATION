@@ -6,12 +6,10 @@ citEntry(entry="Manual",
          Organization = " University Duisburg-Essen",
          address = " Essen, Germany",
          year = 2016,
-         note = "R package version 1.0",
-         url = "http://www.bioconductor.org/packages/release/genphen.html",
+         note = "R package version 1.7",
+         url = "http://bioconductor.org/packages/genphen/",
          textVersion =
          paste("Simo Kitanovski (2016) ",
                " genphen: A tool for computing genotype-phenotype associations
                using statistical learning techniques, ",
-               " University Duisburg-Essen, Essen, Germany, ",
-                "	http://www.bioconductor.org/packages/release/genphen.html",
-                " Version = 1.0",".",sep="") )
+               " University Duisburg-Essen, Essen, Germany, ",sep="") )

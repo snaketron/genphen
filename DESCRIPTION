@@ -4,28 +4,19 @@ Title: A tool for quantification of associations between genotypes and
     phenotypes with statistical learning techniques such as random forests
     and support vector machines as well as with Bayesian inference using
     hierarchical models
-Version: 1.7.0
-Date: 2016-09-28
+Version: 1.6.1
+Date: 2018-01-01
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
-Description: Genetic association studies have become an essential tool for
-    studying the relationship between genotypes and phenotypes. They are
-    necessary for the discovery of disease-causing genetic variants. Here we
-    provide a tool for conducting genetic association studies, which uses
-    statistical learning techniques such as random forests and support vector
-    machines, as well as using Bayesian inference with Bayesian hierarchical
-    models. These techniques are superior to the commonly used (frequentist)
-    statistical approaches, alleviating the multiple hypothesis problems and
-    the need for P value corrections, which often lead to massive numbers of
-    false negatives. Thus, with genphen we provide a framework to compare the
-    results obtained using frequentist methods with those obtained using the
-    more sophisticated methods provided by this tool. The tool also provides a
-    few visualization functions which enable the user to inspect the results of
-    such genetic association study and conveniently select the genotypes which
-    have the highest strength of association with the phenotype.
+Description: Genetic association studies are an essential tool for studying the 
+    relationship between genotypes and phenotypes and thus for the discovery of 
+    disease-causing genetic variants. With genphen we propose a new method for
+    conducting genetic association studies, using a combined approach which is 
+    based on both Bayesian inference and statistical learning techniques such as 
+    random forests and support vector machines.
 License: GPL (>= 2)
-Depends: R(>= 3.3), randomForest, e1071, ggplot2, effsize,
-    Biostrings, rjags
+Depends: R(>= 3.4), randomForest, e1071, ggplot2, effsize, Biostrings, rstan, 
+    boot
 LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,

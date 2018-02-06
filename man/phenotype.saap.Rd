@@ -8,7 +8,7 @@
 
 
 \title{
-Phenotype dataset
+Continuous phenotype dataset
 }
 
 
@@ -37,7 +37,7 @@ data(phenotype.saap)
 
 
 \value{
-Vector of 51 metric elements, representing phenotypes measured for 120
+Vector of 120 metric elements, representing phenotypes measured for 120
 organisms.
 }
 

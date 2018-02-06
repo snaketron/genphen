@@ -11,7 +11,7 @@
 
 
 \title{
-Phenotype dataset
+Continuous phenotype dataset
 }
 
 
