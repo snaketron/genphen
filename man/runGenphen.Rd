@@ -27,7 +27,7 @@ while the second score is estimated with random forest (RF).
 \usage{
 runGenphen(genotype, phenotype, phenotype.type, mcmc.chains,
            mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-           with.ppc, stat.learn.method)
+           with.ppc, stat.learn.method, cv.iterations)
 }
 
 
@@ -49,6 +49,7 @@ predictive checks.}
 \item{stat.learn.method}{Character parameter used to specify the statistical
 learning method used in the analysis. Currently two methods are available:
 random forest ('rf') and support vector machine ('svm').}
+\item{cv.iterations}{cross-validation iterations (default = 1000).}
 }
 
 
@@ -169,7 +170,8 @@ continuous.analysis <- runGenphen(genotype = genotype.saap[, 1:5],
                                   mcmc.cores = 2,
                                   hdi.level = 0.95,
                                   with.ppc = FALSE,
-                                  stat.learn.method = "rf")
+                                  stat.learn.method = "rf",
+                                  cv.iterations = 1000)
 
 # II: Dichotomous phenotype analysis
 
@@ -188,7 +190,8 @@ dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 1:5],
                                    mcmc.cores = 2,
                                    hdi.level = 0.95,
                                    with.ppc = FALSE,
-                                   stat.learn.method = "rf")
+                                   stat.learn.method = "rf",
+                                   cv.iterations = 1000)
 }
 
 

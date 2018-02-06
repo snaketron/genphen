@@ -286,7 +286,7 @@ the genotype is a protein sequence alignment composed of 6 sites and 120
 individuals (sequences), and a continuous phenotype measured for each of the
 individuals.
 
-<<echo=F, include=T, results=hide>>=
+<<echo=FALSE, include=TRUE, results=hide>>=
 require(genphen)
 require(ggplot2)
 require(knitr)
@@ -308,7 +308,8 @@ c.out <- runGenphen(genotype = genotype.saap[, 80:85],
                     mcmc.cores = 2,
                     hdi.level = 0.95,
                     with.ppc = TRUE,
-                    stat.learn.method = "rf")
+                    stat.learn.method = "rf",
+                    cv.iterations = 1000)
 @
 
 First we show an overview of the distribution of the phenotype across each of
@@ -319,8 +320,8 @@ followed by quantification fo the association strength as explained in
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
-df <- data.frame(genotype.saap[, 80:85], stringsAsFactors = F)
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
+df <- data.frame(genotype.saap[, 80:85], stringsAsFactors = FALSE)
 df$phenotype <- phenotype.saap
 df <- melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
@@ -349,7 +350,7 @@ followed by the type of the polymorphism.
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=6>>=
 c.out$scores$label <- paste(c.out$scores$site, c.out$scores$mutation, sep = ':')
 ggplot(data = c.out$scores)+
   geom_errorbar(aes(x = ca, ymin = cohens.d.L, ymax = cohens.d.H))+
@@ -375,11 +376,11 @@ by the rstan package. Small sample size of specific alleles (of a site) are
 often the cause of such warnings, which are then reported for the the alleles
 of that site.
 
-<<echo=F, include=T>>=
+<<echo=FALSE, include=TRUE>>=
 kable(c.out$convergence[, 1:7], align = "c", digits = 2)
 @
 
-<<echo=F, include=T>>=
+<<echo=FALSE, include=TRUE>>=
 kable(c.out$convergence[, c(1:3, 8:9)], align = "c", digits = 2)
 @
 
@@ -400,7 +401,7 @@ shown in the figure below.
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
 ppc <- c.out$ppc
 ggplot(data = ppc)+
   facet_wrap(facets = ~site, scales = "free_x")+
@@ -428,7 +429,7 @@ phenotype is of dichotomous type. The genotype input is a protein sequence
 alignment composed of 12 sites and 120 individuals (sequences), and the
 phenotype is a vector of 120 dichotomous values measured for each individual.
 
-<<echo=F, include=T, results=hide>>=
+<<echo=FALSE, include=TRUE, results=hide>>=
 # genotype inputs:
 data(genotype.saap)
 # phenotype inputs:
@@ -444,7 +445,8 @@ d.out <- runGenphen(genotype = genotype.saap[, 68:79],
                     mcmc.cores = 2,
                     hdi.level = 0.95,
                     with.ppc = TRUE,
-                    stat.learn.method = "rf")
+                    stat.learn.method = "rf",
+                    cv.iterations = 1000)
 @
 
 First we show an overview of the distribution of the phenotype across each of
@@ -455,8 +457,8 @@ followed by quantification fo the association strength as explained in
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
-df <- data.frame(genotype.saap[, 68:79], stringsAsFactors = F)
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=6>>=
+df <- data.frame(genotype.saap[, 68:79], stringsAsFactors = FALSE)
 df$phenotype <- dichotomous.phenotype.saap
 df <- melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
@@ -484,7 +486,7 @@ number, followed by the type of the polymorphism.
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=6>>=
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=6>>=
 d.out$scores$label <- paste(d.out$scores$site, d.out$scores$mutation, sep = ':')
 ggplot(data = d.out$scores)+
   geom_errorbar(aes(x = ca, ymin = absolute.d.L, ymax = absolute.d.H))+
@@ -505,11 +507,11 @@ A similar analysis was performed and described in \ref{sec:case1}.
 \begin{itemize}
 \item convergence
 
-<<echo=F, include=T>>=
+<<echo=FALSE, include=TRUE>>=
 kable(d.out$convergence[, 1:7], align = "c", digits = 2)
 @
 
-<<echo=F, include=T>>=
+<<echo=FALSE, include=TRUE>>=
 kable(d.out$convergence[, c(1:3, 6:7)], align = "c", digits = 2)
 @
 
@@ -517,7 +519,7 @@ kable(d.out$convergence[, c(1:3, 6:7)], align = "c", digits = 2)
 
 \begin{figure}[H]
 \centering
-<<echo=F, include=T, results=hide, fig=T, width=8, height=4>>=
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
 ppc <- d.out$ppc
 ggplot(data = ppc)+
   facet_wrap(facets = ~site, scales = "free_x")+

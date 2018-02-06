@@ -9,7 +9,8 @@ runGenphen <- function(genotype = NULL,
                        mcmc.cores = 1,
                        hdi.level = 0.95,
                        with.ppc = FALSE,
-                       stat.learn.method = "rf") {
+                       stat.learn.method = "rf",
+                       cv.iterations = 1000) {
 
   # check inputs
   checkInput(genotype = genotype,
@@ -42,7 +43,7 @@ runGenphen <- function(genotype = NULL,
 
 
   # compile model
-  compileModel(phenotype.type = phenotype.type)
+  model.stan <- compileModel(phenotype.type = phenotype.type)
 
 
   convergence <- NULL
@@ -65,11 +66,8 @@ runGenphen <- function(genotype = NULL,
                          hdi.level = hdi.level,
                          model.stan = model.stan,
                          with.ppc = with.ppc)
-      rm(model.stan)
-      gc(verbose = FALSE)
     }
     else if(phenotype.type == "dichotomous") {
-
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
       cat("============================================================= \n")
       cat("======== Main Analysis Progress: ", progress.indicator, "% ",
@@ -83,8 +81,6 @@ runGenphen <- function(genotype = NULL,
                           hdi.level = hdi.level,
                           model.stan = model.stan,
                           with.ppc = with.ppc)
-      rm(model.stan)
-      gc(verbose = FALSE)
     }
 
 
@@ -96,14 +92,14 @@ runGenphen <- function(genotype = NULL,
     if(stat.learn.method == "rf") {
       ca <- getRfCa(data.list = genphen.data[[s]],
                     cv.fold = 0.66,
-                    cv.steps = 1000,
+                    cv.steps = cv.iterations,
                     hdi.level = hdi.level,
                     ntree = 1000)
     }
     else if(stat.learn.method == "svm") {
       ca <- getSvmCa(data.list = genphen.data[[s]],
                      cv.fold = 0.66,
-                     cv.steps = 1000,
+                     cv.steps = cv.iterations,
                      hdi.level = hdi.level)
     }
 

@@ -1096,4 +1096,6 @@ compileModel <- function(phenotype.type) {
     f <- system.file("extdata", "dichotomous.stan", package = "genphen")
     model.stan <- stan_model(file = f, model_name = "dichotomous")
   }
+
+  return(model.stan)
 }
