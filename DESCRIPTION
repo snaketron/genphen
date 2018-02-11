@@ -4,7 +4,7 @@ Title: A tool for quantification of associations between genotypes and
     phenotypes with statistical learning techniques such as random forests
     and support vector machines as well as with Bayesian inference using
     hierarchical models
-Version: 1.6.1
+Version: 1.6.2
 Date: 2018-01-01
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>

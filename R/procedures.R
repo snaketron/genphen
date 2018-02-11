@@ -1,7 +1,6 @@
 
 
 
-
 # Description:
 # Get genotype-phenotype data in format for stan
 getGenphenData <- function(genotype, phenotype, phenotype.type,
@@ -43,6 +42,11 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
       }
     }
 
+    # if empty return NULL
+    if(length(out) == 0) {
+      return(NULL)
+    }
+
     # correct empirical SD
     for(i in 1:length(out)) {
       for(j in 1:length(out[[i]]$E_sigma)) {
@@ -79,6 +83,13 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
       }
     }
   }
+
+  # if empty return NULL
+  if(length(out) == 0) {
+    return(NULL)
+  }
+
+
   return (out)
 }
 
@@ -129,13 +140,14 @@ convertMsaToGenotype <- function(genotype) {
 
 
 
-
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
 checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
                        mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-                       stat.learn.method, with.ppc) {
+                       stat.learn.method, with.ppc, cv.iterations,
+                       diagnostics.points, diagnostics.samples,
+                       diagnostics.rf.trees) {
 
   checkGenotypePhenotype <- function(genotype, phenotype) {
     # CHECK: genotype
@@ -285,7 +297,6 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
   }
 
   checkHdi <- function(hdi.level) {
-    # CHECK: HDI level
     if(length(hdi.level) != 1) {
       stop("The HDI level must be in range (0, 1).")
     }
@@ -325,6 +336,56 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
     }
   }
 
+  checkCv <- function(cv.iterations) {
+    if(length(cv.iterations) != 1) {
+      stop("cv.iterations must be a number (default = 1,000).")
+    }
+
+    if(is.numeric(cv.iterations) == FALSE) {
+      stop("cv.iterations must be a number (default = 1,000).")
+    }
+
+    if(cv.iterations < 500) {
+      stop("cv.iterations >= 500 recomended (default = 1,000).")
+    }
+  }
+
+  checkDiagnostics <- function(diagnostics.points,
+                               diagnostics.samples,
+                               diagnostics.rf.trees) {
+    if(length(diagnostics.points) != 1) {
+      stop("diagnostics.points must be a number (default = 10).")
+    }
+    if(length(diagnostics.samples) != 1) {
+      stop("diagnostics.samples must be a number (default = 10).")
+    }
+    if(length(diagnostics.rf.trees) != 1) {
+      stop("diagnostics.samples must be a number (default = 50,000).")
+    }
+
+
+    if(is.numeric(diagnostics.points) == FALSE) {
+      stop("diagnostics.points must be a number (default = 10).")
+    }
+    if(is.numeric(diagnostics.samples) == FALSE) {
+      stop("diagnostics.samples must be a number (default = 10).")
+    }
+    if(is.numeric(diagnostics.rf.trees) == FALSE) {
+      stop("diagnostics.rf.trees must be a number (default = 50,000).")
+    }
+
+
+    if(diagnostics.points <= 1) {
+      stop("diagnostics.points >= 2 accepted (default = 10).")
+    }
+    if(diagnostics.samples <= 0) {
+      stop("diagnostics.samples >= 1 accepted (default = 10).")
+    }
+    if(diagnostics.rf.trees <= 10000) {
+      stop("diagnostics.rf.trees >= 10,000 accepted (default = 50,000).")
+    }
+  }
+
   if(is.null(genotype) | missing(genotype) |
      is.null(phenotype) | missing(phenotype) |
      is.null(phenotype.type) | missing(phenotype.type) |
@@ -334,7 +395,11 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
      is.null(mcmc.cores) | missing(mcmc.cores) |
      is.null(hdi.level) | missing(hdi.level) |
      is.null(stat.learn.method) | missing(stat.learn.method) |
-     is.null(with.ppc) | missing(with.ppc)) {
+     is.null(with.ppc) | missing(with.ppc) |
+     is.null(cv.iterations) | missing(cv.iterations) |
+     is.null(diagnostics.points) | missing(diagnostics.points) |
+     is.null(diagnostics.samples) | missing(diagnostics.samples) |
+     is.null(diagnostics.rf.trees) | missing(diagnostics.rf.trees)) {
     stop("arguments must be non-NULL/specified")
   }
 
@@ -348,10 +413,10 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
   checkHdi(hdi.level = hdi.level)
   checkMlMethod(stat.learn.method = stat.learn.method)
   checkPPC(with.ppc = with.ppc)
+  checkDiagnostics(diagnostics.points = diagnostics.points,
+                   diagnostics.samples = diagnostics.samples,
+                   diagnostics.rf.trees = diagnostics.rf.trees)
 }
-
-
-
 
 
 
@@ -496,9 +561,6 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
 
 
 
-
-
-
 # Description:
 # Given two vectors, one dependent (genotype) and one independent
 # (phenotype), compute the classification accuracy of classifying
@@ -638,7 +700,6 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
 
 
 
-
 # Description:
 # Given a confusion matrix table(predicted, real), compute the Cohen's kappa
 # statistics. Cohen makes the following distinction between the different
@@ -748,7 +809,6 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
 
 
 
-
 # Description:
 # Computes a Bayesian t-test
 runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
@@ -824,9 +884,10 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       sigma.j <- posterior[, paste("sigma.", j, sep = '')]
 
 
-      # compute Cohen's d and HDI's
-      pool.sd <- sqrt(((sigma.i^2)*(n.i-1)+(sigma.j^2)*(n.j-1))/(n.i+n.j-2))
-      cohens.d <- (mu.i - mu.j)/pool.sd
+      # compute Cohen's d and HDI's: Hedges 1981
+      # pool.sd <- sqrt(((sigma.i^2)*(n.i-1)+(sigma.j^2)*(n.j-1))/(n.i+n.j-2))
+      # cohens.d <- (mu.i - mu.j)/pool.sd
+      cohens.d <- (mu.i - mu.j)/sqrt((sigma.i^2 + sigma.j^2)/2)
       cohens.d.mean <- mean(cohens.d)
       cohens.d.hdi <- getHdi(vec = cohens.d, hdi.level = hdi.level)
       cohens.d.L = cohens.d.hdi[1]
@@ -913,7 +974,6 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                convergence.out = convergence.out,
                ppc.out = ppc.out))
 }
-
 
 
 
@@ -1080,6 +1140,7 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 
 
+
 # Description:
 # Given a phenotype.type, the procedure compiles the appropriate STAN model.
 compileModel <- function(phenotype.type) {
@@ -1099,3 +1160,5 @@ compileModel <- function(phenotype.type) {
 
   return(model.stan)
 }
+
+
