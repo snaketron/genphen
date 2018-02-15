@@ -8,7 +8,6 @@ runGenphen <- function(genotype = NULL,
                        mcmc.warmup = 500,
                        mcmc.cores = 1,
                        hdi.level = 0.95,
-                       with.ppc = FALSE,
                        stat.learn.method = "rf",
                        cv.iterations = 1000) {
 
@@ -22,7 +21,6 @@ runGenphen <- function(genotype = NULL,
              mcmc.cores = mcmc.cores,
              hdi.level = hdi.level,
              stat.learn.method = stat.learn.method,
-             with.ppc = with.ppc,
              cv.iterations = cv.iterations,
              diagnostics.points = 10,
              diagnostics.samples = 10,
@@ -52,7 +50,6 @@ runGenphen <- function(genotype = NULL,
 
   convergence <- NULL
   results <- NULL
-  ppc <- NULL
   cas <- NULL
   for(s in 1:length(genphen.data)) {
     if(phenotype.type == "continuous") {
@@ -68,8 +65,7 @@ runGenphen <- function(genotype = NULL,
                          mcmc.warmup = mcmc.warmup,
                          mcmc.cores = mcmc.cores,
                          hdi.level = hdi.level,
-                         model.stan = model.stan,
-                         with.ppc = with.ppc)
+                         model.stan = model.stan)
     }
     else if(phenotype.type == "dichotomous") {
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
@@ -83,8 +79,7 @@ runGenphen <- function(genotype = NULL,
                           mcmc.warmup = mcmc.warmup,
                           mcmc.cores = mcmc.cores,
                           hdi.level = hdi.level,
-                          model.stan = model.stan,
-                          with.ppc = with.ppc)
+                          model.stan = model.stan)
     }
 
 
@@ -92,7 +87,7 @@ runGenphen <- function(genotype = NULL,
     cat("============================================================= \n")
     cat("=================== Statistical Learning ==================== \n")
     cat("============================================================= \n")
-    # CA and Kappa
+    # CA
     if(stat.learn.method == "rf") {
       ca <- getRfCa(data.list = genphen.data[[s]],
                     cv.fold = 0.66,
@@ -112,7 +107,6 @@ runGenphen <- function(genotype = NULL,
     results <- rbind(results, o$statistics.out)
     cas <- rbind(cas, ca)
     convergence <- rbind(convergence, o$convergence.out)
-    ppc <- rbind(ppc, o$ppc)
   }
 
 
@@ -123,16 +117,15 @@ runGenphen <- function(genotype = NULL,
     nice.scores <- scores[, c("site", "mutation", "general",
                               "cohens.d", "cohens.d.L", "cohens.d.H",
                               "ca", "ca.L", "ca.H",
-                              "kappa", "kappa.L", "kappa.H")]
+                              "b.coef")]
   }
   else if(phenotype.type == "dichotomous") {
     nice.scores <- scores[, c("site", "mutation", "general",
                               "absolute.d", "absolute.d.L", "absolute.d.H",
                               "ca", "ca.L", "ca.H",
-                              "kappa", "kappa.L", "kappa.H")]
+                              "b.coef")]
   }
   return(list(scores = nice.scores,
-              ppc = ppc,
               convergence = convergence,
               debug.scores = scores))
 }
@@ -163,7 +156,6 @@ runDiagnostics <- function(genotype = NULL,
              mcmc.cores = mcmc.cores,
              hdi.level = hdi.level,
              stat.learn.method = "rf",
-             with.ppc = F,
              cv.iterations = cv.iterations,
              diagnostics.points = diagnostics.points,
              diagnostics.samples = diagnostics.samples,
@@ -181,7 +173,7 @@ runDiagnostics <- function(genotype = NULL,
 
 
   # find importances: prepare for ranger
-  rf.data <- data.frame(genotype, stringsAsFactors = F)
+  rf.data <- data.frame(genotype, stringsAsFactors = FALSE)
   if(phenotype.type == "continuous") {
     rf.data$phenotype <- phenotype
   }
@@ -197,8 +189,8 @@ runDiagnostics <- function(genotype = NULL,
   rf.out <- data.frame(site = 1:length(rf.out$variable.importance),
                        importance = rf.out$variable.importance,
                        diagnostics.point = NA,
-                       stringsAsFactors = F)
-  genotype <- genotype[, order(rf.out$importance, decreasing = T)]
+                       stringsAsFactors = FALSE)
+  genotype <- genotype[, order(rf.out$importance, decreasing = TRUE)]
 
 
   # compile model
@@ -210,7 +202,7 @@ runDiagnostics <- function(genotype = NULL,
                         length.out = diagnostics.points))
 
   # set diagnostcs.points
-  rf.out <- rf.out[order(rf.out$importance, decreasing = T), ]
+  rf.out <- rf.out[order(rf.out$importance, decreasing = TRUE), ]
   rf.out$diagnostics.point[points] <- 1:length(points)
 
   results <- NULL
@@ -240,8 +232,7 @@ runDiagnostics <- function(genotype = NULL,
                              mcmc.warmup = mcmc.warmup,
                              mcmc.cores = mcmc.cores,
                              hdi.level = hdi.level,
-                             model.stan = model.stan,
-                             with.ppc = FALSE)
+                             model.stan = model.stan)
         }
         else if(phenotype.type == "dichotomous") {
           o <- runDichotomous(data.list = genphen.data[[s]],
@@ -250,12 +241,11 @@ runDiagnostics <- function(genotype = NULL,
                               mcmc.warmup = mcmc.warmup,
                               mcmc.cores = mcmc.cores,
                               hdi.level = hdi.level,
-                              model.stan = model.stan,
-                              with.ppc = FALSE)
+                              model.stan = model.stan)
         }
 
 
-        # CA and Kappa
+        # CA
         ca <- getRfCa(data.list = genphen.data[[s]],
                       cv.fold = 0.66,
                       cv.steps = cv.iterations,
@@ -281,7 +271,7 @@ runDiagnostics <- function(genotype = NULL,
   scores <- merge(x = results, y = cas, all = TRUE,
                   by = c("site", "mutation", "general", "diagnostics.point"))
 
-  scores <- scores[order(scores$diagnostics.point, decreasing = F), ]
+  scores <- scores[order(scores$diagnostics.point, decreasing = FALSE), ]
   scores$diagnostics.point <- factor(scores$diagnostics.point,
                                      levels = 1:length(points))
 

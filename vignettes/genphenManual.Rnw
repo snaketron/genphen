@@ -307,7 +307,6 @@ c.out <- runGenphen(genotype = genotype.saap[, 80:85],
                     mcmc.warmup = 500,
                     mcmc.cores = 2,
                     hdi.level = 0.95,
-                    with.ppc = TRUE,
                     stat.learn.method = "rf",
                     cv.iterations = 1000)
 @
@@ -354,8 +353,7 @@ followed by the type of the polymorphism.
 c.out$scores$label <- paste(c.out$scores$site, c.out$scores$mutation, sep = ':')
 ggplot(data = c.out$scores)+
   geom_errorbar(aes(x = ca, ymin = cohens.d.L, ymax = cohens.d.H))+
-  geom_point(aes(x = ca, y = cohens.d, fill = kappa), shape = 21, size = 4)+
-  scale_fill_gradientn(colours = terrain.colors(10), limits = c(0, 1))+
+  geom_point(aes(x = ca, y = cohens.d), shape = 21, size = 4)+
   geom_text_repel(aes(x = ca, y = cohens.d, label = label), size = 4)+
   theme_bw(base_size = 16)+
   xlab(label = "CA")+
@@ -399,25 +397,6 @@ simulated and real phenotype using the Bhattacharyya coefficient (BC)
 $BC = 0$ representing no overlap and $BC = 1$ a complete overlap. Both are
 shown in the figure below.
 
-\begin{figure}[H]
-\centering
-<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
-ppc <- c.out$ppc
-ggplot(data = ppc)+
-  facet_wrap(facets = ~site, scales = "free_x")+
-  geom_errorbar(aes(x = g.i,ymin = sim.mu.L,ymax = sim.mu.H), col = "blue")+
-  geom_errorbar(aes(x = g.i,ymin = real.mu.L,ymax = real.mu.H),
-                col = "orange", linetype = "dotdash")+
-  geom_point(aes(x = g.i, y = sim.mu), col = "blue")+
-  geom_point(aes(x = g.i, y = real.mu), col = "orange")+
-  geom_text(aes(x = g.i, y = sim.mu.H + 0.1,
-                label = round(x = b.coef, digits = 2)))+
-  theme_bw(base_size = 16)+
-  xlab(label = "Genotypes")+
-  ylab(label = "Phenotype (with 95% HDI)")+
-  ggtitle(label = "Posterior predictive check: orange = real, blue = ppc")
-@
-\end{figure}
 \end{itemize}
 
 \subsection{Case study II: Association between SNPs and a *dichotomous*
@@ -444,7 +423,6 @@ d.out <- runGenphen(genotype = genotype.saap[, 68:79],
                     mcmc.warmup = 500,
                     mcmc.cores = 2,
                     hdi.level = 0.95,
-                    with.ppc = TRUE,
                     stat.learn.method = "rf",
                     cv.iterations = 1000)
 @
@@ -490,12 +468,11 @@ number, followed by the type of the polymorphism.
 d.out$scores$label <- paste(d.out$scores$site, d.out$scores$mutation, sep = ':')
 ggplot(data = d.out$scores)+
   geom_errorbar(aes(x = ca, ymin = absolute.d.L, ymax = absolute.d.H))+
-  geom_point(aes(x = ca, y = absolute.d, fill = kappa), shape = 21, size = 4)+
-  scale_fill_gradientn(colours = terrain.colors(10), limits = c(0, 1))+
+  geom_point(aes(x = ca, y = absolute.d), shape = 21, size = 4)+
   geom_text_repel(aes(x = ca, y = absolute.d, label = label), size = 4)+
   theme_bw(base_size = 16)+
   xlab(label = "CA")+
-    ylab(label = "Absolute d (with 95% HDI)")+
+  ylab(label = "Absolute d (with 95% HDI)")+
   scale_x_continuous(limits = c(0, 1))+
   geom_hline(yintercept = 0, linetype = "dashed")
 @
@@ -514,28 +491,6 @@ kable(d.out$convergence[, 1:7], align = "c", digits = 2)
 <<echo=FALSE, include=TRUE>>=
 kable(d.out$convergence[, c(1:3, 6:7)], align = "c", digits = 2)
 @
-
-\item ppc
-
-\begin{figure}[H]
-\centering
-<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
-ppc <- d.out$ppc
-ggplot(data = ppc)+
-  facet_wrap(facets = ~site, scales = "free_x")+
-  geom_errorbar(aes(x = g.i,ymin = sim.mu.L,ymax = sim.mu.H), col = "blue")+
-  geom_errorbar(aes(x = g.i,ymin = real.mu.L,ymax = real.mu.H),
-                col = "orange", linetype = "dotdash")+
-  geom_point(aes(x = g.i, y = sim.mu), col = "blue")+
-  geom_point(aes(x = g.i, y = real.mu), col = "orange")+
-  geom_text(aes(x = g.i, y = sim.mu.H + 0.1,
-                label = round(x = b.coef, digits = 2)))+
-  theme_bw(base_size = 16)+
-  xlab(label = "Genotypes")+
-  ylab(label = "Phenotype (error bars = 95% HDI)")+
-  ggtitle(label = "Posterior predictive check: orange = real, blue = ppc")
-@
-\end{figure}
 \end{itemize}
 
 

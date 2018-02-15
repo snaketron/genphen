@@ -145,9 +145,8 @@ convertMsaToGenotype <- function(genotype) {
 # stops the execution if a problem is encountered and prints out warnings.
 checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
                        mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-                       stat.learn.method, with.ppc, cv.iterations,
-                       diagnostics.points, diagnostics.samples,
-                       diagnostics.rf.trees) {
+                       stat.learn.method, cv.iterations, diagnostics.points,
+                       diagnostics.samples, diagnostics.rf.trees) {
 
   checkGenotypePhenotype <- function(genotype, phenotype) {
     # CHECK: genotype
@@ -325,17 +324,6 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
     }
   }
 
-  checkPPC <- function(with.ppc) {
-    # CHECK: mcmc.iterations
-    if(length(with.ppc) != 1) {
-      stop("with.ppc must be logical parameter of size 1 (default = FALSE).")
-    }
-
-    if(!is.logical(with.ppc)) {
-      stop("with.ppc must be logical parameter of size 1 (default = FALSE).")
-    }
-  }
-
   checkCv <- function(cv.iterations) {
     if(length(cv.iterations) != 1) {
       stop("cv.iterations must be a number (default = 1,000).")
@@ -395,7 +383,6 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
      is.null(mcmc.cores) | missing(mcmc.cores) |
      is.null(hdi.level) | missing(hdi.level) |
      is.null(stat.learn.method) | missing(stat.learn.method) |
-     is.null(with.ppc) | missing(with.ppc) |
      is.null(cv.iterations) | missing(cv.iterations) |
      is.null(diagnostics.points) | missing(diagnostics.points) |
      is.null(diagnostics.samples) | missing(diagnostics.samples) |
@@ -412,11 +399,11 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
   checkMcmcCores(mcmc.cores = mcmc.cores)
   checkHdi(hdi.level = hdi.level)
   checkMlMethod(stat.learn.method = stat.learn.method)
-  checkPPC(with.ppc = with.ppc)
   checkDiagnostics(diagnostics.points = diagnostics.points,
                    diagnostics.samples = diagnostics.samples,
                    diagnostics.rf.trees = diagnostics.rf.trees)
 }
+
 
 
 
@@ -432,7 +419,6 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
   # Description:
   # Perform N number of classifications and compute N number of:
   # - classification accuracy
-  # - kappa statistics
   # - number of successful classifications (ideally == N)
   booter <- function(X, Y, cv.fold, cv.steps, ntree) {
     # number of total data entries
@@ -440,31 +426,42 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
 
     # initialize result vectors
     accuracies <- c()
-    kappas <- c()
     successful.boots <- 0
+
+    # get the size of the smaller sample
+    unique.Y <- unique(Y)
+    min.sample <- min(table(Y))
+    cv.sample <- floor(x = min.sample * cv.fold)
+    ys.1 <- which(Y == unique.Y[1])
+    ys.2 <- which(Y == unique.Y[2])
 
     for(b in 1:cv.steps) {
       # sample at random
-      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                  replace = TRUE)
-      train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
-      test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
+      s.1 <- sample(x = ys.1, size = min.sample, replace = FALSE)
+      s.2 <- sample(x = ys.2, size = min.sample, replace = FALSE)
+
+      train <- data.frame(Y = c(Y[s.1[1:cv.sample]], Y[s.2[1:cv.sample]]),
+                          X = c(X[s.1[1:cv.sample]], X[s.2[1:cv.sample]]),
+                          stringsAsFactors = FALSE)
+      test <- data.frame(Y = c(Y[s.1[(cv.sample + 1):min.sample]],
+                               Y[s.2[(cv.sample + 1):min.sample]]),
+                         X = c(X[s.1[(cv.sample + 1):min.sample]],
+                               X[s.2[(cv.sample + 1):min.sample]]),
+                         stringsAsFactors = FALSE)
 
       # only one type of predictor (no continous variable)
       if(length(unique(train$X)) <= 1) {
         accuracies <- c(accuracies, NA)
-        kappas <- c(kappas, NA)
       }
       else {
         # train classification model (try condition to avoid errors in case
         # only one-level predictor is train data)
-        rf.out <- try(randomForest::randomForest(Y ~ X,
+        rf.out <- try(randomForest::randomForest(as.factor(Y) ~ X,
                                                  data = train,
                                                  ntree = ntree),
                       silent = TRUE)
         if(attr(rf.out, "class")[1] == "try-error") {
           accuracies <- c(accuracies, NA)
-          kappas <- c(kappas, NA)
         }
         else {
           # test classification model
@@ -475,14 +472,6 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
             which(as.character(test$Y)==as.character(prediction)))/nrow(test)
           accuracies <- c(accuracies, ac)
 
-
-          # compute kappa statistics
-          kappa <- getKappa(real = as.character(test$Y),
-                            predicted = as.character(prediction),
-                            aas = unique(Y))
-          kappas <- c(kappas, kappa)
-
-
           # record bootstrap
           successful.boots <- successful.boots + 1
         }
@@ -491,7 +480,6 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
 
     # build result list and return
     result <- list(accuracies = accuracies,
-                   kappas = kappas,
                    successful.boots = successful.boots)
     return (result)
   }
@@ -530,13 +518,6 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
                       round(x = ca.H, digits = 2), ")", sep = '')
 
 
-      # build 95% HDI for the kappas
-      kappa.hdi <- getHdi(vec = class.obj$kappas, hdi.level = hdi.level)
-      kappa.L <- as.numeric(kappa.hdi[1])
-      kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
-
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
@@ -545,18 +526,13 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
                           ca.L = ca.L,
                           ca.H = ca.H,
                           ca.hdi = ca.hdi,
-                          ca.boots = class.obj$successful.boots,
-                          kappa = mean(class.obj$kappas, na.rm = TRUE),
-                          kappa.L = kappa.L,
-                          kappa.H = kappa.H,
-                          kappa.hdi = kappa.hdi)
+                          ca.boots = class.obj$successful.boots)
       ca.out <- rbind(ca.out, stats)
     }
   }
 
   return(ca.out)
 }
-
 
 
 
@@ -572,7 +548,6 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
   # Description:
   # Perform N number of classifications and compute N number of:
   # - classification accuracy
-  # - kappa statistics
   # - number of successful classifications (ideally == N)
   booter <- function(X, Y, cv.fold, cv.steps, ntree) {
     # number of total data entries
@@ -580,30 +555,42 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
 
     # initialize result vectors
     accuracies <- c()
-    kappas <- c()
     successful.boots <- 0
+
+    # get the size of the smaller sample
+    unique.Y <- unique(Y)
+    min.sample <- min(table(Y))
+    cv.sample <- floor(x = min.sample * cv.fold)
+    ys.1 <- which(Y == unique.Y[1])
+    ys.2 <- which(Y == unique.Y[2])
 
     for(b in 1:cv.steps) {
       # sample at random
-      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                  replace = TRUE)
-      train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
-      test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
+      s.1 <- sample(x = ys.1, size = min.sample, replace = FALSE)
+      s.2 <- sample(x = ys.2, size = min.sample, replace = FALSE)
+
+      train <- data.frame(Y = c(Y[s.1[1:cv.sample]], Y[s.2[1:cv.sample]]),
+                          X = c(X[s.1[1:cv.sample]], X[s.2[1:cv.sample]]),
+                          stringsAsFactors = FALSE)
+      test <- data.frame(Y = c(Y[s.1[(cv.sample + 1):min.sample]],
+                               Y[s.2[(cv.sample + 1):min.sample]]),
+                         X = c(X[s.1[(cv.sample + 1):min.sample]],
+                               X[s.2[(cv.sample + 1):min.sample]]),
+                         stringsAsFactors = FALSE)
 
       # only one type of predictor (no continous variable)
       if(length(unique(train$X)) <= 1) {
         accuracies <- c(accuracies, NA)
-        kappas <- c(kappas, NA)
       }
       else {
         # train classification model (try condition to avoid errors in case
         # only one-level predictor is train data)
-        svm.out <- try(e1071::svm(Y ~ X, data = train,
+        svm.out <- try(e1071::svm(as.factor(Y) ~ X,
+                                  data = train,
                                   type = "C-classification"),
                        silent = TRUE)
         if(attr(svm.out, "class")[1] == "try-error") {
           accuracies <- c(accuracies, NA)
-          kappas <- c(kappas, NA)
         }
         else {
           # test classification model
@@ -612,15 +599,6 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
           # compute classification accuracy (1 - classification error)
           ac <- length(
             which(as.character(test$Y)==as.character(prediction)))/nrow(test)
-          accuracies <- c(accuracies, ac)
-
-
-          # compute kappa statistics
-          kappa <- getKappa(real = as.character(test$Y),
-                            predicted = as.character(prediction),
-                            aas = unique(Y))
-          kappas <- c(kappas, kappa)
-
 
           # record bootstrap
           successful.boots <- successful.boots + 1
@@ -629,9 +607,7 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
     }
 
     # build result list and return
-    result <- list(accuracies = accuracies,
-                   kappas = kappas,
-                   successful.boots = successful.boots)
+    result <- list(accuracies = accuracies, successful.boots = successful.boots)
     return (result)
   }
 
@@ -668,14 +644,6 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
       ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
                       round(x = ca.H, digits = 2), ")", sep = '')
 
-
-      # build 95% HDI for the kappas
-      kappa.hdi <- getHdi(vec = class.obj$kappas, hdi.level = hdi.level)
-      kappa.L <- as.numeric(kappa.hdi[1])
-      kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
-
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
@@ -684,54 +652,12 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
                           ca.L = ca.L,
                           ca.H = ca.H,
                           ca.hdi = ca.hdi,
-                          ca.boots = class.obj$successful.boots,
-                          kappa = mean(class.obj$kappas, na.rm = TRUE),
-                          kappa.L = kappa.L,
-                          kappa.H = kappa.H,
-                          kappa.hdi = kappa.hdi)
+                          ca.boots = class.obj$successful.boots)
       ca.out <- rbind(ca.out, stats)
     }
   }
 
   return(ca.out)
-}
-
-
-
-
-
-# Description:
-# Given a confusion matrix table(predicted, real), compute the Cohen's kappa
-# statistics. Cohen makes the following distinction between the different
-# kappa ranges:
-# if kappa<0 => "no agreement"
-# if 0.0-0.2 => "slignt agreement"
-# if 0.2-0.4 => "fair agreement"
-# if 0.4-0.6 => "moderate agreement"
-# if 0.6-0.8 => "substantial agreement"
-# if 0.8-1.0 => "almost perfect agreement"
-getKappa <- function(predicted, real, aas) {
-
-  buildConfusionMatrix <- function(predicted, real) {
-    conf <- matrix(data = 0, nrow = 2, ncol = 2)
-    conf[1, 1] <- length(intersect(which(real %in% aas[1]),
-                                   which(predicted %in% aas[1])))
-    conf[2, 2] <- length(intersect(which(real %in% aas[2]),
-                                   which(predicted %in% aas[2])))
-    conf[2, 1] <- length(intersect(which(real %in% aas[1]),
-                                   which(!predicted %in% aas[1])))
-    conf[1, 2] <- length(intersect(which(real %in% aas[2]),
-                                   which(!predicted %in% aas[2])))
-    return (conf)
-  }
-
-  conf <- buildConfusionMatrix(predicted = predicted, real = real)
-  expected.accuracy <- (sum(conf[1, ])/sum(conf) * sum(conf[, 1])/sum(conf))+
-    (sum(conf[2, ])/sum(conf) * sum(conf[, 2])/sum(conf))
-  real.accuracy <- (conf[1, 1] + conf[2, 2])/sum(conf)
-  kappa <- (real.accuracy - expected.accuracy)/(1 - expected.accuracy)
-
-  return (kappa)
 }
 
 
@@ -812,7 +738,7 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
 # Description:
 # Computes a Bayesian t-test
 runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
-                          mcmc.cores, hdi.level, model.stan, with.ppc) {
+                          mcmc.cores, hdi.level, model.stan) {
 
   # get initial parameter values
   posterior <- sampling(object = model.stan,
@@ -880,11 +806,13 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       # extract posterior
       mu.i <- posterior[, paste("mu.", i, sep = '')]
       sigma.i <- posterior[, paste("sigma.", i, sep = '')]
+      nu.i <- posterior[, paste("nu.", i, sep = '')]
       mu.j <- posterior[, paste("mu.", j, sep = '')]
       sigma.j <- posterior[, paste("sigma.", j, sep = '')]
+      nu.j <- posterior[, paste("nu.", j, sep = '')]
 
 
-      # compute Cohen's d and HDI's: Hedges 1981
+      # alternative Cohen's d based on Hedges 1981
       # pool.sd <- sqrt(((sigma.i^2)*(n.i-1)+(sigma.j^2)*(n.j-1))/(n.i+n.j-2))
       # cohens.d <- (mu.i - mu.j)/pool.sd
       cohens.d <- (mu.i - mu.j)/sqrt((sigma.i^2 + sigma.j^2)/2)
@@ -893,7 +821,13 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       cohens.d.L = cohens.d.hdi[1]
       cohens.d.H = cohens.d.hdi[2]
       cohens.d.hdi <- paste("(", round(x = cohens.d.L, digits = 2), ", ",
-                           round(x = cohens.d.H, digits = 2), ")", sep = '')
+                            round(x = cohens.d.H, digits = 2), ")", sep = '')
+
+
+      # Bhat coeff
+      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^4, df = mean(nu.i))
+      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^4, df = mean(nu.j))
+      b.coef <- getBhattacharyya(x = ppc.i, y = ppc.j)
 
 
       stats <- data.frame(site = site,
@@ -902,77 +836,14 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                           cohens.d = cohens.d.mean,
                           cohens.d.L = cohens.d.L,
                           cohens.d.H = cohens.d.H,
-                          cohens.d.hdi = cohens.d.hdi)
+                          cohens.d.hdi = cohens.d.hdi,
+                          b.coef = b.coef)
       statistics.out <- rbind(statistics.out, stats)
     }
   }
 
-
-
-  # posterior predictive checks
-  ppc.out <- NULL
-  if(with.ppc == TRUE) {
-    ppc.out <- c()
-    for(i in 1:max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      g.i <- data.list$G[data.list$X == i][1]
-
-
-      # extract posterior
-      mu.i <- posterior[, paste("mu.", i, sep = '')]
-      sigma.i <- posterior[, paste("sigma.", i, sep = '')]
-      nu <- posterior[, "nu"]
-
-
-      real.t <- getMeanHdi(vec = data.list$Y[data.list$X == i],
-                           hdi.level = hdi.level)
-      real.mu <- mean(real.t$mu)
-      real.mu.hdi <- getHdi(vec = real.t$mu, hdi.level = hdi.level)
-      real.mu.L <- real.mu.hdi[1]
-      real.mu.H <- real.mu.hdi[2]
-      real.mu.hdi <- paste("(", round(x = real.mu.L, digits = 2), ", ",
-                           round(x = real.mu.H, digits = 2), ")", sep = '')
-
-      # Procedure (repeat 1000 times)
-      # 1) simulate n samples from a t distribution with parameters mu, sigma and
-      # nu obtained from the Bayesian inference
-      # 2) compute Cohen's d between simulated and real vectors (both of size n)
-      # comment: expected is a low Cohen's d
-      sim.t <- numeric(length = nrow(posterior))
-      for(j in 1:nrow(posterior)) {
-        sim.t[j] <- mean(stats::rt(n = n.i, df = nu[j]) * sigma.i[j] + mu.i[j])
-      }
-      sim.t.mean <- mean(sim.t)
-      sim.t.hdi <- getHdi(vec = sim.t, hdi.level = hdi.level)
-      sim.mu.L <- sim.t.hdi[1]
-      sim.mu.H <- sim.t.hdi[2]
-      sim.mu.hdi <- paste("(", round(x = sim.mu.L, digits = 2), ", ",
-                          round(x = sim.mu.H, digits = 2), ")", sep = '')
-
-      # estimate overlap real vs ppc
-      b.coef <- getBhattacharyya(x = real.t$mu, y = sim.t)
-
-      ppc <- data.frame(site = site,
-                        g.i = g.i,
-                        n.i = n.i,
-                        real.mu = real.mu,
-                        real.mu.L = real.mu.L,
-                        real.mu.H = real.mu.H,
-                        real.mu.hdi = real.mu.hdi,
-                        sim.mu = sim.t.mean,
-                        sim.mu.L = sim.mu.L,
-                        sim.mu.H = sim.mu.H,
-                        sim.mu.hdi = sim.mu.hdi,
-                        b.coef = b.coef)
-      ppc.out <- rbind(ppc.out, ppc)
-    }
-  }
-
   return (list(statistics.out = statistics.out,
-               convergence.out = convergence.out,
-               ppc.out = ppc.out))
+               convergence.out = convergence.out))
 }
 
 
@@ -981,7 +852,7 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 # Description:
 # Computes a Bayesian odds-ratio test
 runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
-                           mcmc.cores, hdi.level, model.stan, with.ppc) {
+                           mcmc.cores, hdi.level, model.stan) {
 
 
   # get initial parameter values
@@ -1060,82 +931,30 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                               sep = '')
 
 
+      # Bhat coeff
+      ppc.i <- numeric(length = nrow(posterior))
+      ppc.j <- numeric(length = nrow(posterior))
+      for(p in 1:nrow(posterior)) {
+        ppc.i[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.i[p]))
+        ppc.j[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.j[p]))
+      }
+      b.coef <- getBhattacharyya(x = ppc.i, y = ppc.j)
+
+
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
                           absolute.d = absolute.d.mean,
                           absolute.d.L = absolute.d.L,
                           absolute.d.H = absolute.d.H,
-                          absolute.d.hdi = absolute.d.hdi)
+                          absolute.d.hdi = absolute.d.hdi,
+                          b.coef = b.coef)
       statistics.out <- rbind(statistics.out, stats)
     }
   }
 
-
-
-
-  # posterior predictive checks
-  ppc.out <- NULL
-  if(with.ppc == TRUE) {
-    ppc.out <- c()
-    for(i in 1:max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      g.i <- data.list$G[data.list$X == i][1]
-      general <- paste(g.i, ":", n.i, sep = '')
-
-
-      # extract posterior
-      mu.i <- posterior[, paste("mu.", i, sep = '')]
-
-
-      real.p <- getMeanHdi(vec = data.list$Y[data.list$X == i],
-                           hdi.level = hdi.level)
-      real.mu <- mean(real.p$mu)
-      real.mu.hdi <- getHdi(vec = real.p$mu, hdi.level = hdi.level)
-      real.mu.L <- real.mu.hdi[1]
-      real.mu.H <- real.mu.hdi[2]
-      real.mu.hdi <- paste("(", round(x = real.mu.L, digits = 2), ", ",
-                           round(x = real.mu.H, digits = 2), ")", sep = '')
-
-      # Procedure (repeat 1000 times)
-      # 1) simulate n samples from a Bernoulli distribution with parameter mu,
-      # obtained from the Bayesian inference
-      sim.p <- numeric(length = nrow(posterior))
-      for(j in 1:nrow(posterior)) {
-        sim.trials <- stats::rbinom(n = n.i, size = 1, prob = mu.i[j])
-        sim.p[j] <- mean(sim.trials)
-      }
-      sim.mu <- mean(sim.p)
-      sim.mu.hdi <- getHdi(vec = sim.p, hdi.level = hdi.level)
-      sim.mu.L <- sim.mu.hdi[1]
-      sim.mu.H <- sim.mu.hdi[2]
-      sim.mu.hdi <- paste("(", round(x = sim.mu.L, digits = 2), ", ",
-                          round(x = sim.mu.H, digits = 2), ")", sep = '')
-
-      # estimate overlap real vs ppc
-      b.coef <- getBhattacharyya(x = real.p$mu, y = sim.p)
-
-      ppc <- data.frame(site = site,
-                        g.i = g.i,
-                        n.i = n.i,
-                        real.mu = real.mu,
-                        real.mu.L = real.mu.L,
-                        real.mu.H = real.mu.H,
-                        real.mu.hdi = real.mu.hdi,
-                        sim.mu = sim.mu,
-                        sim.mu.L = sim.mu.L,
-                        sim.mu.H = sim.mu.H,
-                        sim.mu.hdi = sim.mu.hdi,
-                        b.coef = b.coef)
-      ppc.out <- rbind(ppc.out, ppc)
-    }
-  }
-
   return (list(statistics.out = statistics.out,
-               convergence.out = convergence.out,
-               ppc.out = ppc.out))
+               convergence.out = convergence.out))
 }
 
 

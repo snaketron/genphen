@@ -4,8 +4,8 @@ Title: A tool for quantification of associations between genotypes and
     phenotypes with statistical learning techniques such as random forests
     and support vector machines as well as with Bayesian inference using
     hierarchical models
-Version: 1.6.2
-Date: 2018-01-01
+Version: 1.7.1
+Date: 2018-02-15
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
 Description: Genetic association studies are an essential tool for studying the 
@@ -15,8 +15,8 @@ Description: Genetic association studies are an essential tool for studying the
     based on both Bayesian inference and statistical learning techniques such as 
     random forests and support vector machines.
 License: GPL (>= 2)
-Depends: R(>= 3.4), randomForest, e1071, ggplot2, effsize, Biostrings, rstan, 
-    boot
+Depends: R(>= 3.4), stats, graphics, randomForest, e1071, ggplot2, effsize, 
+    Biostrings, rstan, boot, ranger
 LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,

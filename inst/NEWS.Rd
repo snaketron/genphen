@@ -18,6 +18,7 @@
       dichotomous phenotypes
       \item Additional genotype-phenotype association metrics added
       \item Posterior predictive checks implemented
+      \item Procedure for data reduction (runDiagnostics) added
       \item Tutorial updated
     }
   }

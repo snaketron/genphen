@@ -1,18 +1,23 @@
-# Export all names
 export(
-  runGenphen
+  runGenphen,
+  runDiagnostics
 )
 
 # Import packages listed as Imports or Depends
 import(
+  stats,
+  graphics,
+  randomForest,
   e1071,
   ggplot2,
   effsize,
   Biostrings,
   rstan,
-  boot
+  boot,
+  ranger
 )
 
 importFrom("randomForest", randomForest)
-
+importFrom("graphics", "hist")
+importFrom("stats", "bw.nrd0")
 #exportPattern("^[[:alpha:]]+")
