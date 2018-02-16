@@ -806,10 +806,9 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       # extract posterior
       mu.i <- posterior[, paste("mu.", i, sep = '')]
       sigma.i <- posterior[, paste("sigma.", i, sep = '')]
-      nu.i <- posterior[, paste("nu.", i, sep = '')]
       mu.j <- posterior[, paste("mu.", j, sep = '')]
       sigma.j <- posterior[, paste("sigma.", j, sep = '')]
-      nu.j <- posterior[, paste("nu.", j, sep = '')]
+      nu <- posterior[, "nu"]
 
 
       # alternative Cohen's d based on Hedges 1981
@@ -825,8 +824,8 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 
       # Bhat coeff
-      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^4, df = mean(nu.i))
-      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^4, df = mean(nu.j))
+      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^4, df = mean(nu))
+      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^4, df = mean(nu))
       b.coef <- getBhattacharyya(x = ppc.i, y = ppc.j)
 
 

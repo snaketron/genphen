@@ -4,8 +4,8 @@ Title: A tool for quantification of associations between genotypes and
     phenotypes with statistical learning techniques such as random forests
     and support vector machines as well as with Bayesian inference using
     hierarchical models
-Version: 1.7.1
-Date: 2018-02-15
+Version: 1.7.2
+Date: 2018-02-17
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
 Description: Genetic association studies are an essential tool for studying the 
