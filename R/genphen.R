@@ -21,10 +21,7 @@ runGenphen <- function(genotype = NULL,
              mcmc.cores = mcmc.cores,
              hdi.level = hdi.level,
              stat.learn.method = stat.learn.method,
-             cv.iterations = cv.iterations,
-             diagnostics.points = 10,
-             diagnostics.samples = 10,
-             diagnostics.rf.trees = 50000)
+             cv.iterations = cv.iterations)
 
 
   # convert AAMultipleAlignment to matrix if needed
@@ -87,19 +84,25 @@ runGenphen <- function(genotype = NULL,
     cat("============================================================= \n")
     cat("=================== Statistical Learning ==================== \n")
     cat("============================================================= \n")
+
     # CA
-    if(stat.learn.method == "rf") {
+    if(stat.learn.method == "none") {
+      ca <- getNoneCa(data.list = genphen.data[[s]])
+    }
+    else if(stat.learn.method == "rf") {
       ca <- getRfCa(data.list = genphen.data[[s]],
                     cv.fold = 0.66,
                     cv.steps = cv.iterations,
                     hdi.level = hdi.level,
-                    ntree = 1000)
+                    ntree = 1000,
+                    mcmc.cores = mcmc.cores)
     }
     else if(stat.learn.method == "svm") {
       ca <- getSvmCa(data.list = genphen.data[[s]],
                      cv.fold = 0.66,
                      cv.steps = cv.iterations,
-                     hdi.level = hdi.level)
+                     hdi.level = hdi.level,
+                     mcmc.cores = mcmc.cores)
     }
 
 
@@ -110,6 +113,7 @@ runGenphen <- function(genotype = NULL,
   }
 
 
+
   # merge effect sizes and cas
   scores <- merge(x = results, y = cas, all = TRUE,
                   by = c("site", "mutation", "general"))
@@ -117,13 +121,15 @@ runGenphen <- function(genotype = NULL,
     nice.scores <- scores[, c("site", "mutation", "general",
                               "cohens.d", "cohens.d.L", "cohens.d.H",
                               "ca", "ca.L", "ca.H",
-                              "b.coef")]
+                              "kappa", "kappa.L", "kappa.H",
+                              "bc")]
   }
   else if(phenotype.type == "dichotomous") {
     nice.scores <- scores[, c("site", "mutation", "general",
                               "absolute.d", "absolute.d.L", "absolute.d.H",
                               "ca", "ca.L", "ca.H",
-                              "b.coef")]
+                              "kappa", "kappa.L", "kappa.H",
+                              "bc")]
   }
   return(list(scores = nice.scores,
               convergence = convergence,
@@ -131,20 +137,17 @@ runGenphen <- function(genotype = NULL,
 }
 
 
-
-
 runDiagnostics <- function(genotype = NULL,
                            phenotype = NULL,
                            phenotype.type = NULL,
+                           rf.importance.trees = 50000,
+                           with.anchor.points = FALSE,
                            mcmc.chains = 2,
                            mcmc.iterations = 1000,
                            mcmc.warmup = 500,
                            mcmc.cores = 1,
                            hdi.level = 0.95,
-                           cv.iterations = 1000,
-                           diagnostics.points = 10,
-                           diagnostics.samples = 10,
-                           diagnostics.rf.trees = 50000) {
+                           anchor.points = c(1:5)) {
 
   # check inputs
   checkInput(genotype = genotype,
@@ -155,12 +158,8 @@ runDiagnostics <- function(genotype = NULL,
              mcmc.warmup = mcmc.warmup,
              mcmc.cores = mcmc.cores,
              hdi.level = hdi.level,
-             stat.learn.method = "rf",
-             cv.iterations = cv.iterations,
-             diagnostics.points = diagnostics.points,
-             diagnostics.samples = diagnostics.samples,
-             diagnostics.rf.trees = diagnostics.rf.trees)
-
+             stat.learn.method = "none",
+             cv.iterations = 0)
 
   # convert AAMultipleAlignment to matrix if needed
   genotype <- convertMsaToGenotype(genotype = genotype)
@@ -170,6 +169,13 @@ runDiagnostics <- function(genotype = NULL,
   if(is.vector(genotype)) {
     genotype <- matrix(data = genotype, ncol = 1)
   }
+
+
+  # check input diagnostics
+  checkInputDiagnostics(genotype = genotype,
+                        anchor.points = anchor.points,
+                        with.anchor.points = with.anchor.points,
+                        rf.importance.trees = rf.importance.trees)
 
 
   # find importances: prepare for ranger
@@ -185,31 +191,31 @@ runDiagnostics <- function(genotype = NULL,
   # ranger: importance dataset
   rf.out <- ranger::ranger(dependent.variable.name = "phenotype",
                            data = rf.data, importance = "impurity",
-                           num.trees = diagnostics.rf.trees)
+                           num.trees = rf.importance.trees)
   rf.out <- data.frame(site = 1:length(rf.out$variable.importance),
                        importance = rf.out$variable.importance,
-                       diagnostics.point = NA,
                        stringsAsFactors = FALSE)
   genotype <- genotype[, order(rf.out$importance, decreasing = TRUE)]
+  rf.out <- rf.out[order(rf.out$importance, decreasing = TRUE), ]
+  rf.out$importance.rank <- 1:nrow(rf.out)
+
+
+  # if only RF analysis asked, then return importances only
+  if(with.anchor.points == FALSE) {
+    return (list(scores = NA, importance.scores = rf.out))
+  }
 
 
   # compile model
   model.stan <- compileModel(phenotype.type = phenotype.type)
 
 
-  # now only get the genotypes as used in genphen
-  points <- ceiling(seq(from = 1, to = ncol(genotype)-diagnostics.samples,
-                        length.out = diagnostics.points))
-
-  # set diagnostcs.points
-  rf.out <- rf.out[order(rf.out$importance, decreasing = TRUE), ]
-  rf.out$diagnostics.point[points] <- 1:length(points)
-
   results <- NULL
   cas <- NULL
-  for(p in 1:length(points)) {
-    genotype.data <- genotype[, points[p]:(points[p]+diagnostics.samples-1)]
+  for(p in anchor.points) {
+    genotype.data <- matrix(data = genotype[, p], ncol = 1)
     phenotype.data <- phenotype
+
 
     # genphen.data
     genphen.data <- getGenphenData(genotype = genotype.data,
@@ -217,11 +223,12 @@ runDiagnostics <- function(genotype = NULL,
                                    phenotype.type = phenotype.type,
                                    min.observations = 3)
 
+
     if(length(genphen.data) != 0) {
       for(s in 1:length(genphen.data)) {
         cat("============================================================= \n")
-        cat("========= Diagnostics point:", p, " progress: ",
-            round(s/length(genphen.data)*100, digits = 2), " % ========= \n")
+        cat("=========== Anchor point:", p, " progress: ",
+            round(s/length(genphen.data)*100, digits = 2), " % =========== \n")
         cat("============================================================= \n")
 
 
@@ -245,38 +252,36 @@ runDiagnostics <- function(genotype = NULL,
         }
 
 
-        # CA
-        ca <- getRfCa(data.list = genphen.data[[s]],
-                      cv.fold = 0.66,
-                      cv.steps = cv.iterations,
-                      hdi.level = hdi.level,
-                      ntree = 500)
-
-
         # add marker for diagnostics
-        o$statistics.out$diagnostics.point <- p
-        ca$diagnostics.point <- p
+        o$statistics.out$anchor.point <- p
 
 
         # append results
         results <- rbind(results, o$statistics.out)
-        cas <- rbind(cas, ca)
       }
+    }
+    else {
+      if(phenotype.type == "continuous") {
+        dummy.stats <- data.frame(site = NA, general = NA, mutation = NA,
+                                  cohens.d = NA, cohens.d.L = NA,
+                                  cohens.d.H = NA, cohens.d.hdi = NA,
+                                  bc = 1, anchor.point = p,
+                                  stringsAsFactors = FALSE)
+      }
+      else if(phenotype.type == "dichotomous") {
+        dummy.stats <- data.frame(site = NA, general = NA, mutation = NA,
+                                  absolute.d = NA, absolute.d.L = NA,
+                                  absolute.d.H = NA, absolute.d.hdi = NA,
+                                  bc = 1, anchor.point = p,
+                                  stringsAsFactors = FALSE)
+      }
+      # append results
+      results <- rbind(results, dummy.stats)
     }
   }
 
-
-
-  # merge effect sizes and cas
-  scores <- merge(x = results, y = cas, all = TRUE,
-                  by = c("site", "mutation", "general", "diagnostics.point"))
-
-  scores <- scores[order(scores$diagnostics.point, decreasing = FALSE), ]
-  scores$diagnostics.point <- factor(scores$diagnostics.point,
-                                     levels = 1:length(points))
-
-  return(list(scores = scores, rf.out = rf.out))
+  scores <- results
+  scores <- scores[order(scores$anchor.point, decreasing = FALSE), ]
+  return(list(scores = scores, importance.scores = rf.out))
 }
-
-
 

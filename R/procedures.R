@@ -115,18 +115,6 @@ getHdi <- function(vec, hdi.level) {
 
 
 
-# Description:
-# Given a vector, this procedure computes its mean and CI with bootstrapping.
-getMeanHdi <- function(vec, hdi.level) {
-  boot.mean <- function(data, index) {
-    mean(data[index])
-  }
-  b <- boot::boot(data = vec, statistic = boot.mean, R = 1000)
-  return (list(mu = b$t[, 1]))
-}
-
-
-
 
 # Description:
 # If an object of type DNAMultipleAlignment
@@ -140,13 +128,13 @@ convertMsaToGenotype <- function(genotype) {
 
 
 
+
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
 checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
                        mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-                       stat.learn.method, cv.iterations, diagnostics.points,
-                       diagnostics.samples, diagnostics.rf.trees) {
+                       stat.learn.method, cv.iterations) {
 
   checkGenotypePhenotype <- function(genotype, phenotype) {
     # CHECK: genotype
@@ -312,65 +300,31 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
   checkMlMethod <- function(stat.learn.method) {
     # CHECK: phenotype.type
     if(length(stat.learn.method) != 1) {
-      stop("stat.learn.method must be a string (default = 'rf')")
+      stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
 
     if(!is.character(stat.learn.method)) {
-      stop("stat.learn.method must be a string (default = 'rf')")
+      stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
 
-    if(!stat.learn.method %in% c("rf", "svm")) {
-      stop("stat.learn.method must be a string (either 'rf' or 'svm')")
+    if(!stat.learn.method %in% c("rf", "svm", "none")) {
+      stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
   }
 
-  checkCv <- function(cv.iterations) {
-    if(length(cv.iterations) != 1) {
-      stop("cv.iterations must be a number (default = 1,000).")
-    }
+  checkCv <- function(stat.learn.method, cv.iterations) {
+    if(stat.learn.method %in% c("rf", "svm")) {
+      if(length(cv.iterations) != 1) {
+        stop("cv.iterations must be a number (default = 1,000).")
+      }
 
-    if(is.numeric(cv.iterations) == FALSE) {
-      stop("cv.iterations must be a number (default = 1,000).")
-    }
+      if(is.numeric(cv.iterations) == FALSE) {
+        stop("cv.iterations must be a number (default = 1,000).")
+      }
 
-    if(cv.iterations < 500) {
-      stop("cv.iterations >= 500 recomended (default = 1,000).")
-    }
-  }
-
-  checkDiagnostics <- function(diagnostics.points,
-                               diagnostics.samples,
-                               diagnostics.rf.trees) {
-    if(length(diagnostics.points) != 1) {
-      stop("diagnostics.points must be a number (default = 10).")
-    }
-    if(length(diagnostics.samples) != 1) {
-      stop("diagnostics.samples must be a number (default = 10).")
-    }
-    if(length(diagnostics.rf.trees) != 1) {
-      stop("diagnostics.samples must be a number (default = 50,000).")
-    }
-
-
-    if(is.numeric(diagnostics.points) == FALSE) {
-      stop("diagnostics.points must be a number (default = 10).")
-    }
-    if(is.numeric(diagnostics.samples) == FALSE) {
-      stop("diagnostics.samples must be a number (default = 10).")
-    }
-    if(is.numeric(diagnostics.rf.trees) == FALSE) {
-      stop("diagnostics.rf.trees must be a number (default = 50,000).")
-    }
-
-
-    if(diagnostics.points <= 1) {
-      stop("diagnostics.points >= 2 accepted (default = 10).")
-    }
-    if(diagnostics.samples <= 0) {
-      stop("diagnostics.samples >= 1 accepted (default = 10).")
-    }
-    if(diagnostics.rf.trees <= 10000) {
-      stop("diagnostics.rf.trees >= 10,000 accepted (default = 50,000).")
+      if(cv.iterations < 100) {
+        stop("cv.iterations >= 100 recomended (default = 1,000).")
+      }
     }
   }
 
@@ -383,10 +337,7 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
      is.null(mcmc.cores) | missing(mcmc.cores) |
      is.null(hdi.level) | missing(hdi.level) |
      is.null(stat.learn.method) | missing(stat.learn.method) |
-     is.null(cv.iterations) | missing(cv.iterations) |
-     is.null(diagnostics.points) | missing(diagnostics.points) |
-     is.null(diagnostics.samples) | missing(diagnostics.samples) |
-     is.null(diagnostics.rf.trees) | missing(diagnostics.rf.trees)) {
+     is.null(cv.iterations) | missing(cv.iterations)) {
     stop("arguments must be non-NULL/specified")
   }
 
@@ -399,10 +350,75 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
   checkMcmcCores(mcmc.cores = mcmc.cores)
   checkHdi(hdi.level = hdi.level)
   checkMlMethod(stat.learn.method = stat.learn.method)
-  checkDiagnostics(diagnostics.points = diagnostics.points,
-                   diagnostics.samples = diagnostics.samples,
-                   diagnostics.rf.trees = diagnostics.rf.trees)
+  checkCv(stat.learn.method = stat.learn.method, cv.iterations = cv.iterations)
 }
+
+
+
+
+
+# Description:
+# Provided the input arguments, this function checks their validity. It
+# stops the execution if a problem is encountered and prints out warnings.
+checkInputDiagnostics <- function(genotype, anchor.points,
+                                  with.anchor.points,
+                                  rf.importance.trees){
+
+
+
+  checkAnchors <- function(anchor.points, rf.importance.trees) {
+    if(length(anchor.points) <= 0) {
+      stop("anchor.points must be a numeric vector in range [1:ncol(genotype)]")
+    }
+    if(length(rf.importance.trees) != 1) {
+      stop("diagnostics.samples must be a number (default = 50,000).")
+    }
+
+
+    if(is.numeric(anchor.points) == FALSE) {
+      stop("anchor.points must be a numeric vector.")
+    }
+    if(is.numeric(rf.importance.trees) == FALSE) {
+      stop("rf.importance.trees must be a number (default = 50,000).")
+    }
+
+
+    if(any(anchor.points <= 0)) {
+      stop("anchor.points must be a numeric vector in range [1:ncol(genotype)]")
+    }
+    if(rf.importance.trees <= 10000) {
+      stop("rf.importance.trees >= 10,000 accepted (default = 50,000).")
+    }
+  }
+
+  checkWithAnchorPoints <- function(with.anchor.points) {
+    if(length(with.anchor.points) != 1) {
+      stop("with.anchor.points must be a logical parameter")
+    }
+
+    if(is.logical(with.anchor.points) == FALSE) {
+      stop("with.anchor.points must be a logical parameter")
+    }
+  }
+
+
+  if(is.null(anchor.points) | missing(anchor.points) |
+     is.null(with.anchor.points) | missing(with.anchor.points) |
+     is.null(rf.importance.trees) | missing(rf.importance.trees)) {
+    stop("arguments must be non-NULL/specified")
+  }
+
+  checkAnchors(anchor.points = anchor.points,
+               rf.importance.trees = rf.importance.trees)
+  checkWithAnchorPoints(with.anchor.points = with.anchor.points)
+
+  if(all(anchor.points %in% 1:ncol(genotype)) == FALSE) {
+    stop("The anchor points must lie in the genotype space:",
+         "[", 1, "-", ncol(genotype), "] \n", sep = '')
+  }
+}
+
+
 
 
 
@@ -413,75 +429,51 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
 # The classification is computed using random forests.
-getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
+getRfCa <- function(data.list, cv.fold, cv.steps,
+                    hdi.level, ntree, mcmc.cores) {
 
 
   # Description:
   # Perform N number of classifications and compute N number of:
   # - classification accuracy
+  # - kappa statistics
   # - number of successful classifications (ideally == N)
   booter <- function(X, Y, cv.fold, cv.steps, ntree) {
     # number of total data entries
     rows <- length(Y)
 
-    # initialize result vectors
-    accuracies <- c()
-    successful.boots <- 0
+    # sample at random
+    s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
+                replace = TRUE)
+    train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
+    test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
 
-    # get the size of the smaller sample
-    unique.Y <- unique(Y)
-    min.sample <- min(table(Y))
-    cv.sample <- floor(x = min.sample * cv.fold)
-    ys.1 <- which(Y == unique.Y[1])
-    ys.2 <- which(Y == unique.Y[2])
-
-    for(b in 1:cv.steps) {
-      # sample at random
-      s.1 <- sample(x = ys.1, size = min.sample, replace = FALSE)
-      s.2 <- sample(x = ys.2, size = min.sample, replace = FALSE)
-
-      train <- data.frame(Y = c(Y[s.1[1:cv.sample]], Y[s.2[1:cv.sample]]),
-                          X = c(X[s.1[1:cv.sample]], X[s.2[1:cv.sample]]),
-                          stringsAsFactors = FALSE)
-      test <- data.frame(Y = c(Y[s.1[(cv.sample + 1):min.sample]],
-                               Y[s.2[(cv.sample + 1):min.sample]]),
-                         X = c(X[s.1[(cv.sample + 1):min.sample]],
-                               X[s.2[(cv.sample + 1):min.sample]]),
-                         stringsAsFactors = FALSE)
-
-      # only one type of predictor (no continous variable)
-      if(length(unique(train$X)) <= 1) {
-        accuracies <- c(accuracies, NA)
+    # only one type of predictor (no continous variable)
+    if(length(unique(train$X)) <= 1) {
+      return (list(ca = NA, kappa = NA))
+    }
+    else {
+      # train classification model (try condition to avoid errors in case
+      # only one-level predictor is train data)
+      rf.out <- try(ranger::ranger(as.factor(Y) ~ X, data = train,
+                                   num.trees = ntree), silent = TRUE)
+      if(attr(rf.out, "class")[1] == "try-error") {
+        return (list(ca = NA, kappa = NA))
       }
       else {
-        # train classification model (try condition to avoid errors in case
-        # only one-level predictor is train data)
-        rf.out <- try(randomForest::randomForest(as.factor(Y) ~ X,
-                                                 data = train,
-                                                 ntree = ntree),
-                      silent = TRUE)
-        if(attr(rf.out, "class")[1] == "try-error") {
-          accuracies <- c(accuracies, NA)
-        }
-        else {
-          # test classification model
-          prediction <- stats::predict(object = rf.out, newdata = test)
+        # test classification model
+        pr <- stats::predict(object = rf.out, data = test)
 
-          # compute classification accuracy (1 - classification error)
-          ac <- length(
-            which(as.character(test$Y)==as.character(prediction)))/nrow(test)
-          accuracies <- c(accuracies, ac)
+        # compute classification accuracy (1 - classification error)
+        ca <- sum(as.character(test$Y)==as.character(pr$predictions))/nrow(test)
 
-          # record bootstrap
-          successful.boots <- successful.boots + 1
-        }
+        # compute kappa statistics
+        kappa <- getKappa(real = as.character(test$Y),
+                          predicted = as.character(pr$predictions),
+                          aas = unique(Y))
+        return (list(ca = ca, kappa = kappa))
       }
     }
-
-    # build result list and return
-    result <- list(accuracies = accuracies,
-                   successful.boots = successful.boots)
-    return (result)
   }
 
 
@@ -506,27 +498,169 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
 
 
       # perform classification
-      class.obj <- booter(Y = Y, X = X, cv.fold = cv.fold,
-                          cv.steps = cv.steps, ntree = 1000)
+      registerDoMC(cores = mcmc.cores)
+      class.obj <- (foreach(f = 1:cv.steps) %dopar% booter(Y = Y, X = X,
+                                                           cv.fold = cv.fold,
+                                                           cv.steps = cv.steps,
+                                                           ntree = 1000))
+
+      # get cas and kappas
+      class.obj <- unlist(class.obj)
+      ca <- as.numeric(class.obj[names(class.obj) == "ca"])
+      kappa <- as.numeric(class.obj[names(class.obj) == "kappa"])
 
 
       # get 95% HDI for the classification accuracy
-      ca.hdi <- getHdi(vec = class.obj$accuracies, hdi.level = hdi.level)
+      ca.hdi <- getHdi(vec = ca, hdi.level = hdi.level)
       ca.L <- as.numeric(ca.hdi[1])
       ca.H <- as.numeric(ca.hdi[2])
       ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
                       round(x = ca.H, digits = 2), ")", sep = '')
 
 
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappa, hdi.level = hdi.level)
+      kappa.L <- as.numeric(kappa.hdi[1])
+      kappa.H <- as.numeric(kappa.hdi[2])
+      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
+                         round(x = kappa.H, digits = 2), ")", sep = '')
+
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
-                          ca = mean(class.obj$accuracies, na.rm = TRUE),
+                          ca = mean(ca, na.rm = TRUE),
                           ca.L = ca.L,
                           ca.H = ca.H,
                           ca.hdi = ca.hdi,
-                          ca.boots = class.obj$successful.boots)
+                          kappa = mean(kappa, na.rm = TRUE),
+                          kappa.L = kappa.L,
+                          kappa.H = kappa.H,
+                          kappa.hdi = kappa.hdi)
+      ca.out <- rbind(ca.out, stats)
+    }
+  }
+
+  return(ca.out)
+}
+
+
+
+
+
+# Description:
+# Given two vectors, one dependent (genotype) and one independent
+# (phenotype), compute the classification accuracy of classifying
+# the genotype from the phenotype alone (and corresponding HDI).
+# The classification is computed using support vector machines.
+getSvmCa <- function(data.list, cv.fold, cv.steps,
+                     hdi.level, mcmc.cores) {
+
+
+  # Description:
+  # Perform N number of classifications and compute N number of:
+  # - classification accuracy
+  # - kappa statistics
+  # - number of successful classifications (ideally == N)
+  booter <- function(X, Y, cv.fold) {
+    # number of total data entries
+    rows <- length(Y)
+
+    # sample at random
+    s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
+                replace = TRUE)
+    train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
+    test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
+
+    # only one type of predictor (no continous variable)
+    if(length(unique(train$X)) <= 1) {
+      return (list(ca = NA, kappa = NA))
+    }
+    else {
+      # train classification model (try condition to avoid errors in case
+      # only one-level predictor is train data)
+      svm.out <- try(e1071::svm(as.factor(Y) ~ X, data = train,
+                                type = "C-classification"),
+                     silent = TRUE)
+      if(attr(svm.out, "class")[1] == "try-error") {
+        return (list(ca = NA, kappa = NA))
+      }
+      else {
+        # test classification model
+        prediction <- stats::predict(object = svm.out, newdata = test)
+
+        # compute classification accuracy (1 - classification error)
+        ca <- sum(as.character(test$Y)==as.character(prediction))/nrow(test)
+
+        # compute kappa statistics
+        kappa <- getKappa(real = as.character(test$Y),
+                          predicted = as.character(prediction),
+                          aas = unique(Y))
+        return (list(ca = ca, kappa = kappa))
+      }
+    }
+  }
+
+
+  ca.out <- c()
+  for(i in 1:(max(data.list$X) - 1)) {
+    for(j in (i + 1):max(data.list$X)) {
+
+
+      # general data
+      site <- data.list$site
+      n.i <- data.list$Ng[i]
+      n.j <- data.list$Ng[j]
+      g.i <- data.list$G[data.list$X == i][1]
+      g.j <- data.list$G[data.list$X == j][1]
+      mutation <- paste(g.i, "->", g.j, sep = '')
+      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
+
+
+      # subset predictor/response
+      X <- data.list$Y[data.list$X %in% c(i, j)]
+      Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
+
+
+      # perform classification
+      registerDoMC(cores = mcmc.cores)
+      class.obj <- (foreach(f = 1:cv.steps) %dopar% booter(Y = Y, X = X,
+                                                           cv.fold = cv.fold))
+
+      # get cas and kappas
+      class.obj <- unlist(class.obj)
+      ca <- as.numeric(class.obj[names(class.obj) == "ca"])
+      kappa <- as.numeric(class.obj[names(class.obj) == "kappa"])
+
+
+
+      # get HDI for the classification accuracy
+      ca.hdi <- getHdi(vec = ca, hdi.level = hdi.level)
+      ca.L <- as.numeric(ca.hdi[1])
+      ca.H <- as.numeric(ca.hdi[2])
+      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
+                      round(x = ca.H, digits = 2), ")", sep = '')
+
+
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappa, hdi.level = hdi.level)
+      kappa.L <- as.numeric(kappa.hdi[1])
+      kappa.H <- as.numeric(kappa.hdi[2])
+      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
+                         round(x = kappa.H, digits = 2), ")", sep = '')
+
+      # pack outputs
+      stats <- data.frame(site = site,
+                          general = general,
+                          mutation = mutation,
+                          ca = mean(ca, na.rm = TRUE),
+                          ca.L = ca.L,
+                          ca.H = ca.H,
+                          ca.hdi = ca.hdi,
+                          kappa = mean(kappa, na.rm = TRUE),
+                          kappa.L = kappa.L,
+                          kappa.H = kappa.H,
+                          kappa.hdi = kappa.hdi)
       ca.out <- rbind(ca.out, stats)
     }
   }
@@ -538,78 +672,46 @@ getRfCa <- function(data.list, cv.fold, cv.steps, hdi.level, ntree) {
 
 
 # Description:
-# Given two vectors, one dependent (genotype) and one independent
-# (phenotype), compute the classification accuracy of classifying
-# the genotype from the phenotype alone (and corresponding HDI).
-# The classification is computed using support vector machines.
-getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
+# Given a confusion matrix table(predicted, real), compute the Cohen's kappa
+# statistics. Cohen makes the following distinction between the different
+# kappa ranges:
+# if kappa<0 => "no agreement"
+# if 0.0-0.2 => "slignt agreement"
+# if 0.2-0.4 => "fair agreement"
+# if 0.4-0.6 => "moderate agreement"
+# if 0.6-0.8 => "substantial agreement"
+# if 0.8-1.0 => "almost perfect agreement"
+getKappa <- function(predicted, real, aas) {
 
-
-  # Description:
-  # Perform N number of classifications and compute N number of:
-  # - classification accuracy
-  # - number of successful classifications (ideally == N)
-  booter <- function(X, Y, cv.fold, cv.steps, ntree) {
-    # number of total data entries
-    rows <- length(Y)
-
-    # initialize result vectors
-    accuracies <- c()
-    successful.boots <- 0
-
-    # get the size of the smaller sample
-    unique.Y <- unique(Y)
-    min.sample <- min(table(Y))
-    cv.sample <- floor(x = min.sample * cv.fold)
-    ys.1 <- which(Y == unique.Y[1])
-    ys.2 <- which(Y == unique.Y[2])
-
-    for(b in 1:cv.steps) {
-      # sample at random
-      s.1 <- sample(x = ys.1, size = min.sample, replace = FALSE)
-      s.2 <- sample(x = ys.2, size = min.sample, replace = FALSE)
-
-      train <- data.frame(Y = c(Y[s.1[1:cv.sample]], Y[s.2[1:cv.sample]]),
-                          X = c(X[s.1[1:cv.sample]], X[s.2[1:cv.sample]]),
-                          stringsAsFactors = FALSE)
-      test <- data.frame(Y = c(Y[s.1[(cv.sample + 1):min.sample]],
-                               Y[s.2[(cv.sample + 1):min.sample]]),
-                         X = c(X[s.1[(cv.sample + 1):min.sample]],
-                               X[s.2[(cv.sample + 1):min.sample]]),
-                         stringsAsFactors = FALSE)
-
-      # only one type of predictor (no continous variable)
-      if(length(unique(train$X)) <= 1) {
-        accuracies <- c(accuracies, NA)
-      }
-      else {
-        # train classification model (try condition to avoid errors in case
-        # only one-level predictor is train data)
-        svm.out <- try(e1071::svm(as.factor(Y) ~ X,
-                                  data = train,
-                                  type = "C-classification"),
-                       silent = TRUE)
-        if(attr(svm.out, "class")[1] == "try-error") {
-          accuracies <- c(accuracies, NA)
-        }
-        else {
-          # test classification model
-          prediction <- stats::predict(object = svm.out, newdata = test)
-
-          # compute classification accuracy (1 - classification error)
-          ac <- length(
-            which(as.character(test$Y)==as.character(prediction)))/nrow(test)
-
-          # record bootstrap
-          successful.boots <- successful.boots + 1
-        }
-      }
-    }
-
-    # build result list and return
-    result <- list(accuracies = accuracies, successful.boots = successful.boots)
-    return (result)
+  buildConfusionMatrix <- function(predicted, real) {
+    conf <- matrix(data = 0, nrow = 2, ncol = 2)
+    conf[1, 1] <- length(intersect(which(real %in% aas[1]),
+                                   which(predicted %in% aas[1])))
+    conf[2, 2] <- length(intersect(which(real %in% aas[2]),
+                                   which(predicted %in% aas[2])))
+    conf[2, 1] <- length(intersect(which(real %in% aas[1]),
+                                   which(!predicted %in% aas[1])))
+    conf[1, 2] <- length(intersect(which(real %in% aas[2]),
+                                   which(!predicted %in% aas[2])))
+    return (conf)
   }
+
+  conf <- buildConfusionMatrix(predicted = predicted, real = real)
+  expected.accuracy <- (sum(conf[1, ])/sum(conf) * sum(conf[, 1])/sum(conf))+
+    (sum(conf[2, ])/sum(conf) * sum(conf[, 2])/sum(conf))
+  real.accuracy <- (conf[1, 1] + conf[2, 2])/sum(conf)
+  kappa <- (real.accuracy - expected.accuracy)/(1 - expected.accuracy)
+
+  return (kappa)
+}
+
+
+
+
+
+# Description:
+# Dummy CA output
+getNoneCa <- function(data.list) {
 
 
   ca.out <- c()
@@ -627,38 +729,22 @@ getSvmCa <- function(data.list, cv.fold, cv.steps, hdi.level) {
       general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
 
 
-      # subset predictor/response
-      X <- data.list$Y[data.list$X %in% c(i, j)]
-      Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
-
-
-      # perform classification
-      class.obj <- booter(Y = Y, X = X, cv.fold = cv.fold,
-                          cv.steps = cv.steps, ntree = 1000)
-
-
-      # get HDI for the classification accuracy
-      ca.hdi <- getHdi(vec = class.obj$accuracies, hdi.level = hdi.level)
-      ca.L <- as.numeric(ca.hdi[1])
-      ca.H <- as.numeric(ca.hdi[2])
-      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
-                      round(x = ca.H, digits = 2), ")", sep = '')
-
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
-                          ca = mean(class.obj$accuracies, na.rm = TRUE),
-                          ca.L = ca.L,
-                          ca.H = ca.H,
-                          ca.hdi = ca.hdi,
-                          ca.boots = class.obj$successful.boots)
+                          ca = NA,
+                          ca.L = NA,
+                          ca.H = NA,
+                          ca.hdi = NA,
+                          ca.boots = NA)
       ca.out <- rbind(ca.out, stats)
     }
   }
 
   return(ca.out)
 }
+
 
 
 
@@ -726,10 +812,15 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
   rel.histx<-histx/sum(histx)
   rel.histy<-histy/sum(histy)
 
-  #Calculating the Bhattacharyya Coefficient (sum of the square root of the multiple of the relative counts of both distributions)
-  bhatt.coeff<-sum(sqrt(rel.histx*rel.histy))
-  return(bhatt.coeff)
-  #End
+  #Calculating the Bhattacharyya Coefficient (sum of the square root of
+  # the multiple of the relative counts of both distributions)
+  bc <- sum(sqrt(rel.histx*rel.histy))
+  b.coef.x <- sum(sqrt((histx[histx != 0]/sum(histx[histx != 0]))*
+                         (histy[histx != 0]/sum(histy[histx != 0]))))
+  b.coef.y <- sum(sqrt((histx[histy != 0]/sum(histx[histy != 0]))*
+                         (histy[histy != 0]/sum(histy[histy != 0]))))
+  b.coef.max <- max(b.coef.x, b.coef.y)
+  return(list(bc = bc, b.coef.max = b.coef.max))
 }
 
 
@@ -824,9 +915,10 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 
       # Bhat coeff
-      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^4, df = mean(nu))
-      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^4, df = mean(nu))
-      b.coef <- getBhattacharyya(x = ppc.i, y = ppc.j)
+      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^6, df = mean(nu))
+      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^6, df = mean(nu))
+      bhat <- getBhattacharyya(x = ppc.i, y = ppc.j)
+      bc <- bhat$bc
 
 
       stats <- data.frame(site = site,
@@ -836,7 +928,7 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                           cohens.d.L = cohens.d.L,
                           cohens.d.H = cohens.d.H,
                           cohens.d.hdi = cohens.d.hdi,
-                          b.coef = b.coef)
+                          bc = bc)
       statistics.out <- rbind(statistics.out, stats)
     }
   }
@@ -931,14 +1023,18 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 
       # Bhat coeff
-      ppc.i <- numeric(length = nrow(posterior))
-      ppc.j <- numeric(length = nrow(posterior))
-      for(p in 1:nrow(posterior)) {
-        ppc.i[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.i[p]))
-        ppc.j[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.j[p]))
-      }
-      b.coef <- getBhattacharyya(x = ppc.i, y = ppc.j)
+      # ppc.i <- numeric(length = nrow(posterior))
+      # ppc.j <- numeric(length = nrow(posterior))
+      # for(p in 1:nrow(posterior)) {
+      #   ppc.i[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.i[p]))
+      #   ppc.j[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.j[p]))
+      # }
 
+      # Bhat coeff
+      ppc.i <- stats::rbinom(n = 10^6, prob = mean(mu.i), size = n.i)/n.i
+      ppc.j <- stats::rbinom(n = 10^6, prob = mean(mu.j), size = n.j)/n.j
+      bhat <- getBhattacharyya(x = ppc.i, y = ppc.j)
+      bc <- bhat$bc
 
       stats <- data.frame(site = site,
                           general = general,
@@ -947,7 +1043,7 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                           absolute.d.L = absolute.d.L,
                           absolute.d.H = absolute.d.H,
                           absolute.d.hdi = absolute.d.hdi,
-                          b.coef = b.coef)
+                          bc = bc)
       statistics.out <- rbind(statistics.out, stats)
     }
   }
@@ -966,14 +1062,19 @@ compileModel <- function(phenotype.type) {
   cat("===================== Compiling Model ======================= \n")
   cat("============================================================= \n")
   if(phenotype.type == "continuous") {
-    # f <- "inst/extdata/continuous.stan"
-    f <- system.file("extdata", "continuous.stan", package = "genphen")
-    model.stan <- stan_model(file = f, model_name = "continuous")
+    f.local <- "inst/extdata/continuous.stan"
+    f.pkg <- system.file("extdata", "continuous.stan", package = "genphen")
   }
   else if(phenotype.type == "dichotomous") {
-    # f <- "inst/extdata/dichotomous.stan"
-    f <- system.file("extdata", "dichotomous.stan", package = "genphen")
-    model.stan <- stan_model(file = f, model_name = "dichotomous")
+    f.local <- "inst/extdata/dichotomous.stan"
+    f.pkg <- system.file("extdata", "dichotomous.stan", package = "genphen")
+  }
+
+  if(file.exists(f.pkg)) {
+    model.stan <- stan_model(file = f.pkg, model_name = "model")
+  }
+  if(file.exists(f.local)) {
+    model.stan <- stan_model(file = f.local, model_name = "model")
   }
 
   return(model.stan)

@@ -18,8 +18,8 @@ model {
     Y[i] ~ student_t(nu, mu[X[i]], sigma[X[i]]);
   }
   for(j in 1:Nx) {
-    mu[j] ~ normal(E_mu[j], E_sigma[j]);
-    sigma[j] ~ uniform(E_sigma[j]/100, E_sigma[j]*100);
+    mu[j] ~ normal(E_mu[j], E_sigma[j]*100.0);
+    sigma[j] ~ uniform(E_sigma[j]/100.0, E_sigma[j]*100.0);
   }
-  nu ~ gamma(2, 0.1);
+  nu ~ gamma(2.0, 0.1);
 }

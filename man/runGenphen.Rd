@@ -17,9 +17,8 @@ methods
 \description{
 Given a set of genotypes such as single nucleotide polymorphisms (SNPs) or
 single amino acid polymorphisms (SAAPs) for a set of N individuals, and the
-corresponding phenotypes, genphen computes two association scores between each
-genotype and phenotypes. The first score is computed using Bayesian inference,
-while the second score is estimated with random forest (RF).
+corresponding N phenotypes, genphen computes severaly genotype-phenotypes
+association scores using Bayesian inference and statistical learning.
 }
 
 
@@ -42,11 +41,13 @@ or character vector for dichotonous-phenotype analysis.}
 We recomend mcmc.chains >= 2.}
 \item{mcmc.iterations}{Length of MCMC chains (default = 1,000).}
 \item{mcmc.warmup}{Length of adaptive MCMC chains (default = 500).}
-\item{mcmc.cores}{Number of cores used for the MCMC (default = 1).}
+\item{mcmc.cores}{Number of cores used for the MCMC (default = 1). The same
+parameter is for multicore execution of the statistical learning procedures.}
 \item{hdi.level}{Highest density interval (HDI) (default = 0.95).}
 \item{stat.learn.method}{Character parameter used to specify the statistical
 learning method used in the analysis. Currently two methods are available:
-random forest ('rf') and support vector machine ('svm').}
+random forest ('rf') and support vector machine ('svm'). For no statistical
+learning select 'none'.}
 \item{cv.iterations}{cross-validation iterations (default = 1,000).}
 }
 
@@ -66,7 +67,7 @@ design of the Bayesian hierarchical model which are used.
 }
 
 Goal: To quantify the association between each genotype and phenotype. With
-genphen, we provide two measures of association:
+genphen, we provide several measures of association:
 \itemize{
 \item{Classification accuracy (CA): it is a metric obtained with a statistical
 learning technique such as random forest (RF) or support vector machine (SVM),
@@ -76,23 +77,41 @@ association between a particular SNP and the phenotype, one should be able to
 build a statistical model which accurately classifies the two alleles of that
 SNP solely from the phenotype data (CA approx. 1). Otherwise, the classification
 accuracy of statistical model should be approximately similar to that of simple
-guessing (CA approx. 0.5). Promising SNPs thus have a high CA close to 1.}
+guessing (CA approx. 0.5). Promising SNPs thus have a high CA close to 1.
+
+For each CA estimate, we also compute a corresponding Cohen's kappa statistic.
+With Cohen's kappa we compare the observed CA with the classification accuracy
+which is expected simply by chance (CA_exp). This is in particular useful when
+the genetic states of the genotype are not evenly represented, i.e. allele A of
+a given SNP may be represented in 80\% of the individ-uals, while the other
+allele T may be represented in only 20\% of the individuals. Such an uneven
+composition of the genotype can affect the classification analysis, potentially
+resulting in high CA simply because the classifier only predicts the dominant
+allele. Promising SNPs have high Cohen's kappa close to 1.}
 
 \item{Effect size: for each SNP we compute the effect size, i.e. the size of
 the difference in phenotype observed between its alleles (amino acids in the
 case of SAAP). Depending on the type of the phenotype, we either compute the
 Cohen's d effect size for continuous phenotypes, or the absolute effect size
-for dichotomous phenotypes. We first use Byesian inference to learn the
+for dichotomous phenotypes. We first use Byesian inference to infer the
 parameters of the distribution of the phenotype in each allele, and then plug
 the posterior distribution of these parameters into the corresponding equations
 for computing the effect size. In addition to the point estimates of the effect
 sizes, we also estimate the corresponding highest density intervals (HDIs).}
 
-The two association (CA and effect size) scores can be correlated, i.e. when
-CA is close to 1, the effect size is large. This is not always the case, i.e.
-we can have a small but significant effect size, yet a perfect CA. This is an
-interesting information which could be lost if a single association metric was
-used. Moreover, RF and SVM allow us to capture non-linear associations.
+\item{Bhattacharyya coefficient (BC): the infered parameters needed to compute
+the effect size are used to  perform posterior predictive checks and generate
+simulated distributions of the phenotype for each allele of a given SNP (amino
+acid states in the case of SAAP). Using the Bhattacharyya coefficient, we can
+measure the overlap between any two distributions, i.e. for no or low overlap
+(weak strength of association), BC is close to 0, and BC is close to 1 for a
+complete overlap (strong strength of association).}
+
+The association scores can be correlated, i.e. when CA is close to 1, the effect
+size is large and (BC = 0). This is not always the case, i.e. we can have a
+small but significant effect size, yet a perfect CA. This is an interesting
+information which could be lost if a single association metric was used.
+Moreover, RF and SVM allow us to capture non-linear associations.
 }
 }
 
@@ -109,8 +128,11 @@ point estimate}
 \item{cohens.d.L/cohens.d.H or absolute.d.L/absolute.d.H}{The highest density
 interval (HDI) of the estimated effect size.}
 \item{ca, ca.L, ca.H}{Classification accuracy (CA) estimate and its HDI}
-\item{b.coef}{Bhattacharyya coefficient, overlap degree between the two
-posterior predicted distributions of the phenotypes}
+\item{kappa, kappa.L, kappa.H}{Cohen's kappa estimate and its HDI}
+\item{bc}{Bhattacharyya coefficient, degree of overlap between the posterior
+predicted distributions of the phenotype in the two alleles of a SNP (or two
+amino acid states of an SAAP.}
+
 
 \bold{MCMC convergence parameters:}
 \item{s, g, n}{s=site, g=genotype, n=number of observations}
@@ -121,7 +143,6 @@ each parameter}
 \item{divergence}{Indicator of occuring divergences during the MCMC simulation}
 \item{treedepth}{Indicator of treedepth exceptions during the MCMC simulation}
 }
-
 
 
 \author{

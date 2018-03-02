@@ -7,17 +7,14 @@ export(
 import(
   stats,
   graphics,
-  randomForest,
   e1071,
-  ggplot2,
-  effsize,
   Biostrings,
   rstan,
-  boot,
-  ranger
+  ranger,
+  parallel,
+  doMC,
+  foreach
 )
-
-importFrom("randomForest", randomForest)
 importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")
 #exportPattern("^[[:alpha:]]+")
