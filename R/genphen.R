@@ -91,7 +91,7 @@ runGenphen <- function(genotype = NULL,
     }
     else if(stat.learn.method == "rf") {
       ca <- getRfCa(data.list = genphen.data[[s]],
-                    cv.fold = 0.66,
+                    cv.fold = 0.7,
                     cv.steps = cv.iterations,
                     hdi.level = hdi.level,
                     ntree = 1000,
@@ -99,7 +99,7 @@ runGenphen <- function(genotype = NULL,
     }
     else if(stat.learn.method == "svm") {
       ca <- getSvmCa(data.list = genphen.data[[s]],
-                     cv.fold = 0.66,
+                     cv.fold = 0.7,
                      cv.steps = cv.iterations,
                      hdi.level = hdi.level,
                      mcmc.cores = mcmc.cores)
@@ -122,7 +122,8 @@ runGenphen <- function(genotype = NULL,
                               "cohens.d", "cohens.d.L", "cohens.d.H",
                               "ca", "ca.L", "ca.H",
                               "kappa", "kappa.L", "kappa.H",
-                              "bc")]
+                              "bc",
+                              "sd.d", "sd.d.L", "sd.d.H")]
   }
   else if(phenotype.type == "dichotomous") {
     nice.scores <- scores[, c("site", "mutation", "general",
@@ -135,6 +136,9 @@ runGenphen <- function(genotype = NULL,
               convergence = convergence,
               debug.scores = scores))
 }
+
+
+
 
 
 runDiagnostics <- function(genotype = NULL,
@@ -284,4 +288,64 @@ runDiagnostics <- function(genotype = NULL,
   scores <- scores[order(scores$anchor.point, decreasing = FALSE), ]
   return(list(scores = scores, importance.scores = rf.out))
 }
+
+
+
+
+runPhyloBiasCheck <- function(input.kinship.matrix = NULL,
+                              genotype = NULL) {
+
+  # check params
+  checkInputPhyloBias(input.kinship.matrix = input.kinship.matrix,
+                      genotype = genotype)
+
+  # convert AAMultipleAlignment to matrix if needed
+  genotype <- convertMsaToGenotype(genotype = genotype)
+
+  # if vector genotype => matrix genotype
+  if(is.vector(genotype)) {
+    genotype <- matrix(data = genotype, ncol = 1)
+  }
+
+  # compute kinship if needed
+  if(is.null(input.kinship.matrix) | missing(input.kinship.matrix)) {
+    kinship.matrix <- e1071::hamming.distance(genotype)
+  }
+  else {
+    kinship.matrix <- input.kinship.matrix
+  }
+
+  # compute bias
+  bias <- getPhyloBias(genotype = genotype, k.matrix = kinship.matrix)
+
+  # bias = 1-dist(feature)/dist(total)
+  bias$bias <- 1-bias$feature.dist/bias$total.dist
+
+  # get mutations
+  bias.mutations <- c()
+  sites <- unique(bias$site)
+  for(s in sites) {
+    s.bias <- bias[bias$site == s, ]
+    genotypes <- sort(unique(s.bias$genotype))
+    if(length(genotypes) != 1) {
+      for(g1 in 1:(length(genotypes) - 1)) {
+        bias1 <- s.bias$bias[s.bias$genotype == genotypes[g1]]
+        for(g2 in (g1 + 1):length(genotypes)) {
+          bias2 <- s.bias$bias[s.bias$genotype == genotypes[g2]]
+          mutation <- paste(genotypes[g1], genotypes[g2], sep = "->")
+          mutation.row <- data.frame(site = s, mutation = mutation,
+                                     bias = max(bias1, bias2))
+          bias.mutations <- rbind(bias.mutations, mutation.row)
+        }
+      }
+    }
+  }
+
+
+  return (list(bias = bias[, c("site", "genotype", "bias")],
+               kinship.matrix = kinship.matrix,
+               bias.mutations = bias.mutations))
+}
+
+
 

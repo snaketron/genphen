@@ -3,13 +3,16 @@
 
 # Description:
 # Get genotype-phenotype data in format for stan
-getGenphenData <- function(genotype, phenotype, phenotype.type,
-                           min.observations = 2) {
+getGenphenData <- function(genotype, phenotype,
+                           phenotype.type,
+                           min.observations) {
 
   if(phenotype.type == "continuous") {
     out <- vector(mode = "list")
     out.counter <- 1
-    max.sigma <- 0 # max sigma throughout dataset
+    E_mu <- 0
+    E_sigma <- 0
+
     for(i in 1:ncol(genotype)) {
       js <- unique(genotype[, i])
       if(length(js) != 1) {
@@ -19,23 +22,16 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
           Y <- phenotype[X %in% as.numeric(names(k))]
           G <- genotype[X %in% as.numeric(names(k)), i]
           X <- as.numeric(as.factor(X[X %in% as.numeric(names(k))]))
-
-          Ng <- numeric(length = length(unique(X))) # nr. of samples per genotype
-          E_mu <- numeric(length = length(unique(X)))
-          E_sigma <- numeric(length = length(unique(X)))
+          Ng <- numeric(length = length(unique(X))) # nr.of samples per genotype
           for(j in 1:max(X)) {
             temp.Y <- Y[X == j]
             Ng[j] <- length(temp.Y)
-            E_mu[j] <- mean(temp.Y)
-            E_sigma[j] <- stats::sd(temp.Y)
-
-            # max observed SD in the dataset, use to set as empirical SD if for
-            # a given group only a single observation is avaliable or SD = 0.
-            max.sigma <- max(max.sigma, max(c(E_sigma, 0), na.rm = TRUE))
+            E_mu <- c(E_mu, mean(temp.Y))
+            E_sigma <- c(E_sigma, stats::sd(temp.Y))
           }
 
-          l <- list(site = i, G = G, Y = Y, X = X, Ng = Ng, Nx = length(Ng),
-                    Ny = length(Y), E_mu = E_mu, E_sigma = E_sigma)
+          l <- list(site = i, G = G, Y = Y, X = X, Ng = Ng,
+                    Nx = length(Ng), Ny = length(Y))
           out[[out.counter]] <- l
           out.counter <- out.counter + 1
         }
@@ -47,13 +43,12 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
       return(NULL)
     }
 
-    # correct empirical SD
+    # empirical mean and SD
+    E_mu <- mean(E_mu, na.rm = T)
+    E_sigma <- mean(E_sigma, na.rm = T)
     for(i in 1:length(out)) {
-      for(j in 1:length(out[[i]]$E_sigma)) {
-        if(is.na(out[[i]]$E_sigma[j]) | out[[i]]$E_sigma[j] == 0) {
-          out[[i]]$E_sigma[j] <- max.sigma
-        }
-      }
+      out[[i]]$E_mu <- E_mu
+      out[[i]]$E_sigma <- E_sigma
     }
   }
   else if(phenotype.type == "dichotomous") {
@@ -69,7 +64,7 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
           G <- genotype[X %in% as.numeric(names(k)), i]
           X <- as.numeric(as.factor(X[X %in% as.numeric(names(k))]))
 
-          Ng <- numeric(length = length(unique(X))) # nr. of samples per genotype
+          Ng <- numeric(length = length(unique(X))) # nr.of samples per genotype
           for(j in 1:max(X)) {
             temp.Y <- Y[X == j]
             Ng[j] <- length(temp.Y)
@@ -92,6 +87,75 @@ getGenphenData <- function(genotype, phenotype, phenotype.type,
 
   return (out)
 }
+
+
+
+
+
+
+# Description:
+# Get genotype-phenotype data in format for stan
+getCompleteGenphenData <- function(genotype,
+                                   phenotype,
+                                   min.observations) {
+
+  out.data <- c()
+  for(i in 1:ncol(genotype)) {
+    s.data <- data.frame(S = i, genotype = genotype[, i],
+                         Y = phenotype, stringsAsFactors = F)
+    out.data <- rbind(out.data, s.data)
+  }
+
+  # id variable
+  out.data$X <- paste(out.data$S, out.data$genotype, sep = '')
+
+  # as factor -> as numeric
+  out.data$X <- as.numeric(as.factor(out.data$X))
+  out.data <- out.data[order(out.data$X, decreasing = F), ]
+
+  # I -> counter
+  out.data$I <- 1
+  check <- aggregate(I~X, data = out.data, FUN = sum)
+
+  # keep only ids with count >= min observations
+  out.data <- out.data[out.data$X %in% check$X[check$I >= min.observations], ]
+
+  # II -> remove single sites
+  sites.to.remove <- c()
+  for(site in unique(out.data$S)) {
+    gs <- unique(out.data$genotype[out.data$S == site])
+    if(length(gs) == 1) {
+      sites.to.remove <- c(sites.to.remove, site)
+    }
+  }
+  out.data <- out.data[!out.data$S %in% sites.to.remove, ]
+
+  # refactor in case some were removed in previous step
+  out.data$X <- as.numeric(as.factor(out.data$X))
+  out.data$S <- as.numeric(as.factor(out.data$S))
+
+  # compute empirical mean/sd
+  stats.mean <- aggregate(Y~X, data = out.data, FUN = mean)
+  colnames(stats.mean) <- c("X", "mean.Y")
+  stats.sd <- aggregate(Y~X, data = out.data, FUN = sd)
+  colnames(stats.sd) <- c("X", "sd.Y")
+  stats <- merge(x = stats.mean, y = stats.sd, by = "X")
+
+  # final data for stan
+  data.list <- list(S = out.data$S,
+                    genotype = out.data$genotype,
+                    Y = out.data$Y,
+                    X = out.data$X,
+                    Ny = length(out.data$Y),
+                    Nx = length(unique(out.data$X)),
+                    Ns = length(unique(out.data$S)),
+                    E_mu = mean(stats$mean.Y),
+                    E_sigma = mean(stats$sd.Y))
+
+  return (data.list)
+}
+
+
 
 
 
@@ -425,6 +489,92 @@ checkInputDiagnostics <- function(genotype, anchor.points,
 
 
 # Description:
+# Provided the input arguments, this function checks their validity. It
+# stops the execution if a problem is encountered and prints out warnings.
+checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
+
+
+  checkGenotype <- function(genotype) {
+    if(is.null(attr(genotype, "class")) == FALSE) {
+      if(!attr(genotype, "class") %in% c("AAMultipleAlignment",
+                                         "DNAMultipleAlignment")) {
+        stop("genotype can be one of the following structures: matrix or
+             data.frame or DNAMultipleAlignment/AAMultipleAlignment")
+      }
+      else {
+        temp <- as.matrix(genotype)
+        if(nrow(temp) < 2 | ncol(temp) == 0) {
+          stop("the genotypes cannot have less than two observations the or
+               number of genotypes cannot be 0.")
+        }
+      }
+    }
+    else {
+      if(is.vector(genotype)) {
+        genotype <- matrix(data = genotype, ncol = 1)
+      }
+
+      if(nrow(genotype) < 2 | ncol(genotype) == 0) {
+        stop("the genotypes cannot have less than two observations or the
+             number of genotypes cannot be 0.")
+      }
+
+      if(!is.matrix(genotype) & !is.data.frame(genotype)) {
+        stop("genotype can be one of the following structures: matrix or
+             data.frame or DNAMultipleAlignment/AAMultipleAlignment")
+      }
+
+      if(typeof(genotype) != "character") {
+        stop("if it is structured in matrix/data.frame the genotype must
+           be of character type.")
+      }
+    }
+  }
+
+
+  checkKinship <- function(input.kinship.matrix) {
+
+    if(is.matrix(input.kinship.matrix) == FALSE) {
+      stop("precomputed kinship matrix must be a numeric matrix.")
+    }
+
+    if(is.numeric(input.kinship.matrix) == FALSE) {
+      stop("precomputed kinship matrix must be a numeric matrix.")
+    }
+
+    if(nrow(input.kinship.matrix) != ncol(input.kinship.matrix)) {
+      stop("precomputed kinship matrix must be NxN numeric matrix.")
+    }
+
+    if(nrow(input.kinship.matrix) <= 0) {
+      stop("at least two individuals needed for the analysis.")
+    }
+  }
+
+
+  if((is.null(input.kinship.matrix) | missing(input.kinship.matrix))
+     & (is.null(genotype) | missing(genotype))) {
+    stop("arguments must be non-NULL/specified")
+  }
+
+  if(is.null(input.kinship.matrix) | missing(input.kinship.matrix)) {
+    if(is.null(genotype) | missing(genotype)) {
+      stop("arguments must be non-NULL/specified")
+    }
+  }
+  else {
+    checkKinship(input.kinship.matrix = input.kinship.matrix)
+  }
+  checkGenotype(genotype = genotype)
+}
+
+
+
+
+
+
+
+# Description:
 # Given two vectors, one dependent (genotype) and one independent
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
@@ -438,7 +588,7 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
   # - classification accuracy
   # - kappa statistics
   # - number of successful classifications (ideally == N)
-  booter <- function(X, Y, cv.fold, cv.steps, ntree) {
+  booter <- function(X, Y, cv.fold, ntree) {
     # number of total data entries
     rows <- length(Y)
 
@@ -477,6 +627,125 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
   }
 
 
+  # Description:
+  # Performs the bootstrapping iteratively and breaks if convergence is met
+  # before the number of steps is hit.
+  getIncrementalLearning <- function(Y, X, cv.fold, ntree, I, e = 0.01) {
+
+    # cv.steps == 100
+    if(I == 1) {
+      # ca bootstrap
+      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
+                                                   cv.fold = cv.fold,
+                                                   ntree = 1000))
+
+      # get cas and kappas
+      ca.obj <- unlist(ca.obj)
+      cas <- as.numeric(ca.obj[names(ca.obj) == "ca"])
+      kappas <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
+
+      # get 95% HDI for the classification accuracy
+      ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
+      ca.L <- as.numeric(ca.hdi[1])
+      ca.H <- as.numeric(ca.hdi[2])
+      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
+                      round(x = ca.H, digits = 2), ")", sep = '')
+
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
+      kappa.L <- as.numeric(kappa.hdi[1])
+      kappa.H <- as.numeric(kappa.hdi[2])
+      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
+                         round(x = kappa.H, digits = 2), ")", sep = '')
+
+      return(list(ca = mean(cas, na.rm = TRUE),
+                  ca.L = update.ca.L,
+                  ca.H = update.ca.H,
+                  ca.hdi = ca.hdi,
+                  kappa = mean(kappas, na.rm = TRUE),
+                  kappa.L = update.kappa.L,
+                  kappa.H = update.kappa.H,
+                  kappa.hdi = kappa.hdi,
+                  I = 1))
+    }
+
+
+    # keeptrack
+    old.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
+    updated.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
+
+    cas <- c()
+    kappas <- c()
+    for(i in 1:I) {
+      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
+                                                   cv.fold = cv.fold,
+                                                   ntree = 1000))
+
+      # get cas and kappas
+      ca.obj <- unlist(ca.obj)
+      new.ca <- as.numeric(ca.obj[names(ca.obj) == "ca"])
+      new.kappa <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
+
+      # Update parameters
+      cas <- c(cas, new.ca)
+      kappas <- c(kappas, new.kappa)
+
+      # get 95% HDI for the classification accuracy
+      ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
+      updated.list[["ca.L"]] <- as.numeric(ca.hdi[1])
+      updated.list[["ca.H"]] <- as.numeric(ca.hdi[2])
+
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
+      updated.list[["kappa.L"]] <- as.numeric(kappa.hdi[1])
+      updated.list[["kappa.H"]] <- as.numeric(kappa.hdi[2])
+
+      if(i > 1) {
+        # Error:
+        errors <- c(abs(updated.list[["kappa.L"]]-old.list[["kappa.L"]]) <= e,
+                    abs(updated.list[["kappa.H"]]-old.list[["kappa.H"]]) <= e,
+                    abs(updated.list[["ca.L"]]-old.list[["ca.L"]]) <= e,
+                    abs(updated.list[["ca.H"]]-old.list[["ca.H"]]) <= e)
+
+        if(all(errors) == TRUE) {
+          k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
+          k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
+          c.l <- round(x = updated.list[["ca.L"]], digits = 2)
+          c.h <- round(x = updated.list[["ca.H"]], digits = 2)
+          return(list(ca = mean(cas, na.rm = TRUE),
+                      ca.L = updated.list[["ca.L"]],
+                      ca.H = updated.list[["ca.H"]],
+                      ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
+                      kappa = mean(kappas, na.rm = TRUE),
+                      kappa.L = updated.list[["kappa.L"]],
+                      kappa.H = updated.list[["kappa.H"]],
+                      kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
+                      I = i))
+        }
+      }
+
+      # keep post
+      old.list <- updated.list
+    }
+
+
+    # if no speedup is possible, return the result after cv.steps
+    k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
+    k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
+    c.l <- round(x = updated.list[["ca.L"]], digits = 2)
+    c.h <- round(x = updated.list[["ca.H"]], digits = 2)
+    return(list(ca = mean(cas, na.rm = TRUE),
+                ca.L = updated.list[["ca.L"]],
+                ca.H = updated.list[["ca.H"]],
+                ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
+                kappa = mean(kappas, na.rm = TRUE),
+                kappa.L = updated.list[["kappa.L"]],
+                kappa.H = updated.list[["kappa.H"]],
+                kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
+                I = I))
+  }
+
+
   ca.out <- c()
   for(i in 1:(max(data.list$X) - 1)) {
     for(j in (i + 1):max(data.list$X)) {
@@ -497,46 +766,29 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
       Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
 
 
-      # perform classification
+      # run incremental CA learnings (100 steps in each iteration)
       registerDoMC(cores = mcmc.cores)
-      class.obj <- (foreach(f = 1:cv.steps) %dopar% booter(Y = Y, X = X,
-                                                           cv.fold = cv.fold,
-                                                           cv.steps = cv.steps,
-                                                           ntree = 1000))
+      class.obj <- getIncrementalLearning(Y = Y,
+                                          X = X,
+                                          cv.fold = cv.fold,
+                                          ntree = ntree,
+                                          I = ceiling(x = cv.steps/100),
+                                          e = 0.01)
 
-      # get cas and kappas
-      class.obj <- unlist(class.obj)
-      ca <- as.numeric(class.obj[names(class.obj) == "ca"])
-      kappa <- as.numeric(class.obj[names(class.obj) == "kappa"])
-
-
-      # get 95% HDI for the classification accuracy
-      ca.hdi <- getHdi(vec = ca, hdi.level = hdi.level)
-      ca.L <- as.numeric(ca.hdi[1])
-      ca.H <- as.numeric(ca.hdi[2])
-      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
-                      round(x = ca.H, digits = 2), ")", sep = '')
-
-
-      # build 95% HDI for the kappas
-      kappa.hdi <- getHdi(vec = kappa, hdi.level = hdi.level)
-      kappa.L <- as.numeric(kappa.hdi[1])
-      kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
 
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
-                          ca = mean(ca, na.rm = TRUE),
-                          ca.L = ca.L,
-                          ca.H = ca.H,
-                          ca.hdi = ca.hdi,
-                          kappa = mean(kappa, na.rm = TRUE),
-                          kappa.L = kappa.L,
-                          kappa.H = kappa.H,
-                          kappa.hdi = kappa.hdi)
+                          ca = class.obj$ca,
+                          ca.L = class.obj$ca.L,
+                          ca.H = class.obj$ca.H,
+                          ca.hdi = class.obj$ca.hdi,
+                          kappa = class.obj$kappa,
+                          kappa.L = class.obj$kappa.L,
+                          kappa.H = class.obj$kappa.H,
+                          kappa.hdi = class.obj$kappa.hdi,
+                          I = class.obj$I)
       ca.out <- rbind(ca.out, stats)
     }
   }
@@ -602,6 +854,123 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
   }
 
 
+  # Description:
+  # Performs the bootstrapping iteratively and breaks if convergence is met
+  # before the number of steps is hit.
+  getIncrementalLearning <- function(Y, X, cv.fold, I, e = 0.01) {
+
+    # cv.steps == 100
+    if(I == 1) {
+      # ca bootstrap
+      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
+                                                   cv.fold = cv.fold))
+
+      # get cas and kappas
+      ca.obj <- unlist(ca.obj)
+      cas <- as.numeric(ca.obj[names(ca.obj) == "ca"])
+      kappas <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
+
+      # get 95% HDI for the classification accuracy
+      ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
+      ca.L <- as.numeric(ca.hdi[1])
+      ca.H <- as.numeric(ca.hdi[2])
+      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
+                      round(x = ca.H, digits = 2), ")", sep = '')
+
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
+      kappa.L <- as.numeric(kappa.hdi[1])
+      kappa.H <- as.numeric(kappa.hdi[2])
+      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
+                         round(x = kappa.H, digits = 2), ")", sep = '')
+
+      return(list(ca = mean(cas, na.rm = TRUE),
+                  ca.L = update.ca.L,
+                  ca.H = update.ca.H,
+                  ca.hdi = ca.hdi,
+                  kappa = mean(kappas, na.rm = TRUE),
+                  kappa.L = update.kappa.L,
+                  kappa.H = update.kappa.H,
+                  kappa.hdi = kappa.hdi,
+                  I = 1))
+    }
+
+
+    # keeptrack
+    old.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
+    updated.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
+
+    cas <- c()
+    kappas <- c()
+    for(i in 1:I) {
+      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
+                                                   cv.fold = cv.fold))
+
+      # get cas and kappas
+      ca.obj <- unlist(ca.obj)
+      new.ca <- as.numeric(ca.obj[names(ca.obj) == "ca"])
+      new.kappa <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
+
+      # Update parameters
+      cas <- c(cas, new.ca)
+      kappas <- c(kappas, new.kappa)
+
+      # get 95% HDI for the classification accuracy
+      ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
+      updated.list[["ca.L"]] <- as.numeric(ca.hdi[1])
+      updated.list[["ca.H"]] <- as.numeric(ca.hdi[2])
+
+      # build 95% HDI for the kappas
+      kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
+      updated.list[["kappa.L"]] <- as.numeric(kappa.hdi[1])
+      updated.list[["kappa.H"]] <- as.numeric(kappa.hdi[2])
+
+      if(i > 1) {
+        # Error:
+        errors <- c(abs(updated.list[["kappa.L"]]-old.list[["kappa.L"]]) <= e,
+                    abs(updated.list[["kappa.H"]]-old.list[["kappa.H"]]) <= e,
+                    abs(updated.list[["ca.L"]]-old.list[["ca.L"]]) <= e,
+                    abs(updated.list[["ca.H"]]-old.list[["ca.H"]]) <= e)
+
+        if(all(errors) == TRUE) {
+          k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
+          k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
+          c.l <- round(x = updated.list[["ca.L"]], digits = 2)
+          c.h <- round(x = updated.list[["ca.H"]], digits = 2)
+          return(list(ca = mean(cas, na.rm = TRUE),
+                      ca.L = updated.list[["ca.L"]],
+                      ca.H = updated.list[["ca.H"]],
+                      ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
+                      kappa = mean(kappas, na.rm = TRUE),
+                      kappa.L = updated.list[["kappa.L"]],
+                      kappa.H = updated.list[["kappa.H"]],
+                      kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
+                      I = i))
+        }
+      }
+
+      # keep post
+      old.list <- updated.list
+    }
+
+
+    # if no speedup is possible, return the result after cv.steps
+    k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
+    k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
+    c.l <- round(x = updated.list[["ca.L"]], digits = 2)
+    c.h <- round(x = updated.list[["ca.H"]], digits = 2)
+    return(list(ca = mean(cas, na.rm = TRUE),
+                ca.L = updated.list[["ca.L"]],
+                ca.H = updated.list[["ca.H"]],
+                ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
+                kappa = mean(kappas, na.rm = TRUE),
+                kappa.L = updated.list[["kappa.L"]],
+                kappa.H = updated.list[["kappa.H"]],
+                kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
+                I = I))
+  }
+
+
   ca.out <- c()
   for(i in 1:(max(data.list$X) - 1)) {
     for(j in (i + 1):max(data.list$X)) {
@@ -622,51 +991,35 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
       Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
 
 
-      # perform classification
+      # run incremental CA learnings (100 steps in each iteration)
       registerDoMC(cores = mcmc.cores)
-      class.obj <- (foreach(f = 1:cv.steps) %dopar% booter(Y = Y, X = X,
-                                                           cv.fold = cv.fold))
+      class.obj <- getIncrementalLearning(Y = Y,
+                                          X = X,
+                                          cv.fold = cv.fold,
+                                          I = ceiling(x = cv.steps/100),
+                                          e = 0.01)
 
-      # get cas and kappas
-      class.obj <- unlist(class.obj)
-      ca <- as.numeric(class.obj[names(class.obj) == "ca"])
-      kappa <- as.numeric(class.obj[names(class.obj) == "kappa"])
-
-
-
-      # get HDI for the classification accuracy
-      ca.hdi <- getHdi(vec = ca, hdi.level = hdi.level)
-      ca.L <- as.numeric(ca.hdi[1])
-      ca.H <- as.numeric(ca.hdi[2])
-      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
-                      round(x = ca.H, digits = 2), ")", sep = '')
-
-
-      # build 95% HDI for the kappas
-      kappa.hdi <- getHdi(vec = kappa, hdi.level = hdi.level)
-      kappa.L <- as.numeric(kappa.hdi[1])
-      kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
 
       # pack outputs
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
-                          ca = mean(ca, na.rm = TRUE),
-                          ca.L = ca.L,
-                          ca.H = ca.H,
-                          ca.hdi = ca.hdi,
-                          kappa = mean(kappa, na.rm = TRUE),
-                          kappa.L = kappa.L,
-                          kappa.H = kappa.H,
-                          kappa.hdi = kappa.hdi)
+                          ca = class.obj$ca,
+                          ca.L = class.obj$ca.L,
+                          ca.H = class.obj$ca.H,
+                          ca.hdi = class.obj$ca.hdi,
+                          kappa = class.obj$kappa,
+                          kappa.L = class.obj$kappa.L,
+                          kappa.H = class.obj$kappa.H,
+                          kappa.hdi = class.obj$kappa.hdi,
+                          I = class.obj$I)
       ca.out <- rbind(ca.out, stats)
     }
   }
 
   return(ca.out)
 }
+
 
 
 
@@ -684,26 +1037,27 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
 getKappa <- function(predicted, real, aas) {
 
   buildConfusionMatrix <- function(predicted, real) {
-    conf <- matrix(data = 0, nrow = 2, ncol = 2)
-    conf[1, 1] <- length(intersect(which(real %in% aas[1]),
-                                   which(predicted %in% aas[1])))
-    conf[2, 2] <- length(intersect(which(real %in% aas[2]),
-                                   which(predicted %in% aas[2])))
-    conf[2, 1] <- length(intersect(which(real %in% aas[1]),
-                                   which(!predicted %in% aas[1])))
-    conf[1, 2] <- length(intersect(which(real %in% aas[2]),
-                                   which(!predicted %in% aas[2])))
-    return (conf)
+    cm <- matrix(data = 0, nrow = 2, ncol = 2)
+    cm[1, 1] <- length(intersect(which(real %in% aas[1]),
+                                 which(predicted %in% aas[1])))
+    cm[2, 2] <- length(intersect(which(real %in% aas[2]),
+                                 which(predicted %in% aas[2])))
+    cm[2, 1] <- length(intersect(which(real %in% aas[1]),
+                                 which(!predicted %in% aas[1])))
+    cm[1, 2] <- length(intersect(which(real %in% aas[2]),
+                                 which(!predicted %in% aas[2])))
+    return (cm)
   }
 
-  conf <- buildConfusionMatrix(predicted = predicted, real = real)
-  expected.accuracy <- (sum(conf[1, ])/sum(conf) * sum(conf[, 1])/sum(conf))+
-    (sum(conf[2, ])/sum(conf) * sum(conf[, 2])/sum(conf))
-  real.accuracy <- (conf[1, 1] + conf[2, 2])/sum(conf)
-  kappa <- (real.accuracy - expected.accuracy)/(1 - expected.accuracy)
+  cm <- buildConfusionMatrix(predicted = predicted, real = real)
+
+  ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
+  ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
+  kappa <- (ca-ca.exp)/(1-ca.exp)
 
   return (kappa)
 }
+
 
 
 
@@ -744,6 +1098,7 @@ getNoneCa <- function(data.list) {
 
   return(ca.out)
 }
+
 
 
 
@@ -826,10 +1181,13 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
 
 
 
+
+
 # Description:
 # Computes a Bayesian t-test
-runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
-                          mcmc.cores, hdi.level, model.stan) {
+runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
+                          mcmc.warmup, mcmc.cores, hdi.level,
+                          model.stan) {
 
   # get initial parameter values
   posterior <- sampling(object = model.stan,
@@ -839,7 +1197,8 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                         warmup = mcmc.warmup,
                         chains = mcmc.chains,
                         cores = mcmc.cores,
-                        control = list(adapt_delta = 0.99, max_treedepth = 10),
+                        control = list(adapt_delta = 0.95,
+                                       max_treedepth = 10),
                         verbose = FALSE,
                         refresh = -1)
 
@@ -902,7 +1261,7 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       nu <- posterior[, "nu"]
 
 
-      # alternative Cohen's d based on Hedges 1981
+      # Alternative Cohen's d based on Hedges 1981
       # pool.sd <- sqrt(((sigma.i^2)*(n.i-1)+(sigma.j^2)*(n.j-1))/(n.i+n.j-2))
       # cohens.d <- (mu.i - mu.j)/pool.sd
       cohens.d <- (mu.i - mu.j)/sqrt((sigma.i^2 + sigma.j^2)/2)
@@ -912,6 +1271,16 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
       cohens.d.H = cohens.d.hdi[2]
       cohens.d.hdi <- paste("(", round(x = cohens.d.L, digits = 2), ", ",
                             round(x = cohens.d.H, digits = 2), ")", sep = '')
+
+
+      # Difference in sd
+      sd.d <- sigma.i - sigma.j
+      sd.d.mean <- mean(sd.d)
+      sd.d.hdi <- getHdi(vec = sd.d, hdi.level = hdi.level)
+      sd.d.L = sd.d.hdi[1]
+      sd.d.H = sd.d.hdi[2]
+      sd.d.hdi <- paste("(", round(x = sd.d.L, digits = 2), ", ",
+                        round(x = sd.d.H, digits = 2), ")", sep = '')
 
 
       # Bhat coeff
@@ -928,7 +1297,11 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
                           cohens.d.L = cohens.d.L,
                           cohens.d.H = cohens.d.H,
                           cohens.d.hdi = cohens.d.hdi,
-                          bc = bc)
+                          bc = bc,
+                          sd.d = sd.d.mean,
+                          sd.d.L = sd.d.L,
+                          sd.d.H = sd.d.H,
+                          sd.d.hdi = sd.d.hdi)
       statistics.out <- rbind(statistics.out, stats)
     }
   }
@@ -942,8 +1315,9 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
 
 # Description:
 # Computes a Bayesian odds-ratio test
-runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations, mcmc.warmup,
-                           mcmc.cores, hdi.level, model.stan) {
+runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
+                           mcmc.warmup, mcmc.cores, hdi.level,
+                           model.stan) {
 
 
   # get initial parameter values
@@ -1079,5 +1453,39 @@ compileModel <- function(phenotype.type) {
 
   return(model.stan)
 }
+
+
+
+
+
+
+# Description:
+# Given a genotype dataset containing SNPs (columns) and N individuals (rows),
+# the procedure computes a NxN kinship matrix for the individuals and estimates
+# the phylogenetic bias related to each SNP.
+getPhyloBias <- function(genotype, k.matrix) {
+  phylo.bias <- c()
+
+  # total mean phylogenetic distance
+  mean.d.t <- mean(k.matrix[upper.tri(x = k.matrix, diag = FALSE)])
+
+  for(i in 1:ncol(genotype)) {
+    gs <- unique(genotype[, i])
+    for(g in gs) {
+      # feature mean phylogenetic distance
+      mean.d.f <- mean(k.matrix[genotype[, i] == g, genotype[, i] == g])
+
+      row <- data.frame(site = i, genotype = g, feature.dist = mean.d.f,
+                        total.dist = mean.d.t, stringsAsFactors = F)
+      phylo.bias <- rbind(phylo.bias, row)
+    }
+  }
+
+  return(phylo.bias)
+}
+
+
+
+
 
 

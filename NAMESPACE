@@ -1,6 +1,7 @@
 export(
   runGenphen,
-  runDiagnostics
+  runDiagnostics,
+  runPhyloBiasCheck
 )
 
 # Import packages listed as Imports or Depends

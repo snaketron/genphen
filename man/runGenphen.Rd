@@ -121,6 +121,7 @@ Moreover, RF and SVM allow us to capture non-linear associations.
 \item{mutation}{type of polymorphism (e.g. T->A)}
 \item{data}{number of data points for each allele (e.g. A:10, T:20)}
 
+
 \bold{Association score parameters:}
 \item{cohens.d or absolute.d}{Cohen's d effect size (continuous phenotype
 analysis) or absolute effect size (dichotomous phenotype analysis).
@@ -132,6 +133,8 @@ interval (HDI) of the estimated effect size.}
 \item{bc}{Bhattacharyya coefficient, degree of overlap between the posterior
 predicted distributions of the phenotype in the two alleles of a SNP (or two
 amino acid states of an SAAP.}
+\item{sd.d, sd.d.L, sd.d.H}{(only for continuous phenotypes) Difference in
+standard deviations its HDI}
 
 
 \bold{MCMC convergence parameters:}
@@ -143,7 +146,6 @@ each parameter}
 \item{divergence}{Indicator of occuring divergences during the MCMC simulation}
 \item{treedepth}{Indicator of treedepth exceptions during the MCMC simulation}
 }
-
 
 \author{
   Simo Kitanovski <simo.kitanovski@uni-due.de>
@@ -193,5 +195,5 @@ dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
 
 
 \seealso{
-runDiagnostics
+runDiagnostics, runPhyloBiasCheck
 }

@@ -20,6 +20,7 @@
       \item Posterior predictive checks implemented
       \item Procedure for data reduction (runDiagnostics) added
       \item Tutorial updated
+      \item Simple procedure for phylogenetic bias estimation implemented
     }
   }
 
@@ -27,6 +28,7 @@
     \itemize{
       \item Add practical examples where genphen has been used.
       \item Implement modules for data augmentation
+      \item Update todo after data augmentation
     }
   }
 }

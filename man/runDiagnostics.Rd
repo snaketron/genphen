@@ -18,14 +18,14 @@ or weak associations with the phenotype, genphen allows the user to run a
 light-weight diagnostic procedure which allows the user to discard large portion
 of the non-informative SNPs before running the main association analysis. The
 data reduction step proceeds as follows: 1) using random forest and their
-variable importance metrics, we obtain one importance value for each SNP. We can
-use the spectrum of importances as a 'rough' guide to determine the importance
-level at which the non-informative SNPs are dominant; 2) the user can then
-select different points along the importance spectrum (e.g. ranks 1:5, 100:105,
-1000:1005, ...) for which genphen is run using its standard procedure. We can
-then use the association scores produced by genphen to determine the importance
-rank at which the SNPs are no longer informative and thereby achieve data
-reduction.
+measures of variable importance, we obtain one importance value for each SNP.
+We can use the spectrum of importances as a 'rough' guide to determine the
+importance level at which the non-informative SNPs are dominant; 2) the user
+can then select different points along the importance spectrum (e.g. ranks 1:5,
+100:105, 1000:1005, ...) for which genphen is run using its standard procedure.
+We can then use the association scores produced by genphen to determine the
+importance rank at which the SNPs are no longer informative and thereby achieve
+data reduction.
 }
 
 
@@ -124,5 +124,5 @@ continuous.diagnostics <- runDiagnostics(genotype = genotype.saap,
 }
 
 \seealso{
-runGenphen
+runGenphen, runPhyloBiasCheck
 }
