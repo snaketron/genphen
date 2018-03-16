@@ -2,8 +2,8 @@ Package: genphen
 Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes with Bayesian inference and statistical learning techniques
-Version: 1.7.8
-Date: 2018-03-09
+Version: 1.7.9
+Date: 2018-03-14
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
 Description: Genetic association studies are an essential tool for studying the 
@@ -14,7 +14,7 @@ Description: Genetic association studies are an essential tool for studying the
     random forests and support vector machines.
 License: GPL (>= 2)
 Depends: R(>= 3.4), stats, graphics, e1071, Biostrings, rstan, ranger, 
-    parallel, doMC, foreach
+    parallel, foreach, doParallel
 LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,

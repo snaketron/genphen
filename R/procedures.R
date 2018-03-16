@@ -584,53 +584,83 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
 
 
   # Description:
-  # Perform N number of classifications and compute N number of:
-  # - classification accuracy
-  # - kappa statistics
-  # - number of successful classifications (ideally == N)
-  booter <- function(X, Y, cv.fold, ntree) {
-    # number of total data entries
-    rows <- length(Y)
+  # Performs the bootstrapping iteratively and breaks if convergence
+  # is met before the number of steps is hit.
+  getIncrementalLearning <- function(Y, X, cv.fold, ntree, I, e = 0.01) {
 
-    # sample at random
-    s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                replace = TRUE)
-    train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
-    test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
 
-    # only one type of predictor (no continous variable)
-    if(length(unique(train$X)) <= 1) {
-      return (list(ca = NA, kappa = NA))
-    }
-    else {
-      # train classification model (try condition to avoid errors in case
-      # only one-level predictor is train data)
-      rf.out <- try(ranger::ranger(as.factor(Y) ~ X, data = train,
-                                   num.trees = ntree), silent = TRUE)
-      if(attr(rf.out, "class")[1] == "try-error") {
+    # Description:
+    # Perform N number of classifications and compute N number of:
+    # - classification accuracy
+    # - kappa statistics
+    # - number of successful classifications (ideally == N)
+    booter <- function(X, Y, cv.fold, ntree) {
+      # number of total data entries
+      rows <- length(Y)
+
+      # sample at random
+      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
+                  replace = TRUE)
+      train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
+      test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
+
+      # only one type of predictor (no continous variable)
+      if(length(unique(train$X)) <= 1) {
         return (list(ca = NA, kappa = NA))
       }
       else {
-        # test classification model
-        pr <- stats::predict(object = rf.out, data = test)
+        # train classification model (try condition to avoid errors in case
+        # only one-level predictor is train data)
+        rf.out <- try(ranger::ranger(as.factor(Y) ~ X, data = train,
+                                     num.trees = ntree), silent = TRUE)
+        if(attr(rf.out, "class")[1] == "try-error") {
+          return (list(ca = NA, kappa = NA))
+        }
+        else {
+          # test classification model
+          pr <- stats::predict(object = rf.out, data = test)
 
-        # compute classification accuracy (1 - classification error)
-        ca <- sum(as.character(test$Y)==as.character(pr$predictions))/nrow(test)
+          # compute classification accuracy (1 - classification error)
+          ca<-sum(as.character(test$Y)==as.character(pr$predictions))/nrow(test)
 
-        # compute kappa statistics
-        kappa <- getKappa(real = as.character(test$Y),
-                          predicted = as.character(pr$predictions),
-                          aas = unique(Y))
-        return (list(ca = ca, kappa = kappa))
+          # compute kappa statistics
+          kappa <- getKappa(real = as.character(test$Y),
+                            predicted = as.character(pr$predictions),
+                            aas = unique(Y))
+          return (list(ca = ca, kappa = kappa))
+        }
       }
     }
-  }
 
 
-  # Description:
-  # Performs the bootstrapping iteratively and breaks if convergence is met
-  # before the number of steps is hit.
-  getIncrementalLearning <- function(Y, X, cv.fold, ntree, I, e = 0.01) {
+    # Description:
+    # Given a confusion matrix table(predicted, real), compute the Cohen's
+    # kappa statistics. Cohen makes the following distinction between the
+    # different kappa ranges.
+    getKappa <- function(predicted, real, aas) {
+
+      buildConfusionMatrix <- function(predicted, real) {
+        cm <- matrix(data = 0, nrow = 2, ncol = 2)
+        cm[1, 1] <- length(intersect(which(real %in% aas[1]),
+                                     which(predicted %in% aas[1])))
+        cm[2, 2] <- length(intersect(which(real %in% aas[2]),
+                                     which(predicted %in% aas[2])))
+        cm[2, 1] <- length(intersect(which(real %in% aas[1]),
+                                     which(!predicted %in% aas[1])))
+        cm[1, 2] <- length(intersect(which(real %in% aas[2]),
+                                     which(!predicted %in% aas[2])))
+        return (cm)
+      }
+
+      cm <- buildConfusionMatrix(predicted = predicted, real = real)
+
+      ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
+      ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
+      kappa <- (ca-ca.exp)/(1-ca.exp)
+
+      return (kappa)
+    }
+
 
     # cv.steps == 100
     if(I == 1) {
@@ -767,14 +797,16 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
 
 
       # run incremental CA learnings (100 steps in each iteration)
-      registerDoMC(cores = mcmc.cores)
+      cl <- parallel::makeCluster(mcmc.cores)
+      doParallel::registerDoParallel(cl)
       class.obj <- getIncrementalLearning(Y = Y,
                                           X = X,
                                           cv.fold = cv.fold,
                                           ntree = ntree,
                                           I = ceiling(x = cv.steps/100),
                                           e = 0.01)
-
+      parallel::stopCluster(cl = cl)
+      doParallel::stopImplicitCluster()
 
       # pack outputs
       stats <- data.frame(site = site,
@@ -808,56 +840,83 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
 getSvmCa <- function(data.list, cv.fold, cv.steps,
                      hdi.level, mcmc.cores) {
 
-
-  # Description:
-  # Perform N number of classifications and compute N number of:
-  # - classification accuracy
-  # - kappa statistics
-  # - number of successful classifications (ideally == N)
-  booter <- function(X, Y, cv.fold) {
-    # number of total data entries
-    rows <- length(Y)
-
-    # sample at random
-    s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                replace = TRUE)
-    train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
-    test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
-
-    # only one type of predictor (no continous variable)
-    if(length(unique(train$X)) <= 1) {
-      return (list(ca = NA, kappa = NA))
-    }
-    else {
-      # train classification model (try condition to avoid errors in case
-      # only one-level predictor is train data)
-      svm.out <- try(e1071::svm(as.factor(Y) ~ X, data = train,
-                                type = "C-classification"),
-                     silent = TRUE)
-      if(attr(svm.out, "class")[1] == "try-error") {
-        return (list(ca = NA, kappa = NA))
-      }
-      else {
-        # test classification model
-        prediction <- stats::predict(object = svm.out, newdata = test)
-
-        # compute classification accuracy (1 - classification error)
-        ca <- sum(as.character(test$Y)==as.character(prediction))/nrow(test)
-
-        # compute kappa statistics
-        kappa <- getKappa(real = as.character(test$Y),
-                          predicted = as.character(prediction),
-                          aas = unique(Y))
-        return (list(ca = ca, kappa = kappa))
-      }
-    }
-  }
-
-
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence is met
   # before the number of steps is hit.
   getIncrementalLearning <- function(Y, X, cv.fold, I, e = 0.01) {
+
+    # Description:
+    # Perform N number of classifications and compute N number of:
+    # - classification accuracy
+    # - kappa statistics
+    # - number of successful classifications (ideally == N)
+    booter <- function(X, Y, cv.fold) {
+      # number of total data entries
+      rows <- length(Y)
+
+      # sample at random
+      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
+                  replace = TRUE)
+      train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
+      test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
+
+      # only one type of predictor (no continous variable)
+      if(length(unique(train$X)) <= 1) {
+        return (list(ca = NA, kappa = NA))
+      }
+      else {
+        # train classification model (try condition to avoid errors in case
+        # only one-level predictor is train data)
+        svm.out <- try(e1071::svm(as.factor(Y) ~ X, data = train,
+                                  type = "C-classification"),
+                       silent = TRUE)
+        if(attr(svm.out, "class")[1] == "try-error") {
+          return (list(ca = NA, kappa = NA))
+        }
+        else {
+          # test classification model
+          prediction <- stats::predict(object = svm.out, newdata = test)
+
+          # compute classification accuracy (1 - classification error)
+          ca <- sum(as.character(test$Y)==as.character(prediction))/nrow(test)
+
+          # compute kappa statistics
+          kappa <- getKappa(real = as.character(test$Y),
+                            predicted = as.character(prediction),
+                            aas = unique(Y))
+          return (list(ca = ca, kappa = kappa))
+        }
+      }
+    }
+
+    # Description:
+    # Given a confusion matrix table(predicted, real), compute the Cohen's
+    # kappa statistics. Cohen makes the following distinction between the
+    # different kappa ranges.
+    getKappa <- function(predicted, real, aas) {
+
+      buildConfusionMatrix <- function(predicted, real) {
+        cm <- matrix(data = 0, nrow = 2, ncol = 2)
+        cm[1, 1] <- length(intersect(which(real %in% aas[1]),
+                                     which(predicted %in% aas[1])))
+        cm[2, 2] <- length(intersect(which(real %in% aas[2]),
+                                     which(predicted %in% aas[2])))
+        cm[2, 1] <- length(intersect(which(real %in% aas[1]),
+                                     which(!predicted %in% aas[1])))
+        cm[1, 2] <- length(intersect(which(real %in% aas[2]),
+                                     which(!predicted %in% aas[2])))
+        return (cm)
+      }
+
+      cm <- buildConfusionMatrix(predicted = predicted, real = real)
+
+      ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
+      ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
+      kappa <- (ca-ca.exp)/(1-ca.exp)
+
+      return (kappa)
+    }
+
 
     # cv.steps == 100
     if(I == 1) {
@@ -991,13 +1050,18 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
       Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
 
 
+
+
       # run incremental CA learnings (100 steps in each iteration)
-      registerDoMC(cores = mcmc.cores)
+      cl <- parallel::makeCluster(mcmc.cores)
+      doParallel::registerDoParallel(cl)
       class.obj <- getIncrementalLearning(Y = Y,
                                           X = X,
                                           cv.fold = cv.fold,
                                           I = ceiling(x = cv.steps/100),
                                           e = 0.01)
+      parallel::stopCluster(cl = cl)
+      doParallel::stopImplicitCluster()
 
 
       # pack outputs
@@ -1019,45 +1083,6 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
 
   return(ca.out)
 }
-
-
-
-
-
-# Description:
-# Given a confusion matrix table(predicted, real), compute the Cohen's kappa
-# statistics. Cohen makes the following distinction between the different
-# kappa ranges:
-# if kappa<0 => "no agreement"
-# if 0.0-0.2 => "slignt agreement"
-# if 0.2-0.4 => "fair agreement"
-# if 0.4-0.6 => "moderate agreement"
-# if 0.6-0.8 => "substantial agreement"
-# if 0.8-1.0 => "almost perfect agreement"
-getKappa <- function(predicted, real, aas) {
-
-  buildConfusionMatrix <- function(predicted, real) {
-    cm <- matrix(data = 0, nrow = 2, ncol = 2)
-    cm[1, 1] <- length(intersect(which(real %in% aas[1]),
-                                 which(predicted %in% aas[1])))
-    cm[2, 2] <- length(intersect(which(real %in% aas[2]),
-                                 which(predicted %in% aas[2])))
-    cm[2, 1] <- length(intersect(which(real %in% aas[1]),
-                                 which(!predicted %in% aas[1])))
-    cm[1, 2] <- length(intersect(which(real %in% aas[2]),
-                                 which(!predicted %in% aas[2])))
-    return (cm)
-  }
-
-  cm <- buildConfusionMatrix(predicted = predicted, real = real)
-
-  ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
-  ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
-  kappa <- (ca-ca.exp)/(1-ca.exp)
-
-  return (kappa)
-}
-
 
 
 

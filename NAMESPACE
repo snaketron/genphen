@@ -13,8 +13,8 @@ import(
   rstan,
   ranger,
   parallel,
-  doMC,
-  foreach
+  foreach,
+  doParallel
 )
 importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")
