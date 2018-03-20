@@ -112,8 +112,8 @@ Two data types are necessary to perform a genetic association study:
 \begin{itemize}
 \item genotype data (e.g. set of 1,000 SNPs found along the aligned genomes of
 10 individuals)
-\item phenotype data (experimental measurement made for each individual such as
-body mass index, immune response, survival, case-control, etc.)
+\item phenotype data (experimental measurement made for each individual such
+as body mass index, immune response, survival, case-control, etc.)
 \end{itemize}
 
 More generally, we can think of the genotype data as a character matrix with
