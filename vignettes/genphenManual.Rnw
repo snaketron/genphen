@@ -112,8 +112,8 @@ Two data types are necessary to perform a genetic association study:
 \begin{itemize}
 \item genotype data (e.g. set of 1,000 SNPs found along the aligned genomes of
 10 individuals)
-\item phenotype data (experimental measurement made for each individual such as
-body mass index, immune response, survival, case-control, etc.)
+\item phenotype data (experimental measurement made for each individual such
+as body mass index, immune response, survival, case-control, etc.)
 \end{itemize}
 
 More generally, we can think of the genotype data as a character matrix with
@@ -382,7 +382,7 @@ c.out <- runGenphen(genotype = genotype.saap[, 80:85],
                     mcmc.chains = 2,
                     mcmc.iterations = 2000,
                     mcmc.warmup = 500,
-                    mcmc.cores = 8,
+                    mcmc.cores = 4,
                     hdi.level = 0.95,
                     stat.learn.method = "rf",
                     cv.iterations = 300)
@@ -551,7 +551,7 @@ d.out <- runGenphen(genotype = genotype.saap[, 68:79],
                     mcmc.chains = 2,
                     mcmc.iterations = 2000,
                     mcmc.warmup = 500,
-                    mcmc.cores = 8,
+                    mcmc.cores = 4,
                     hdi.level = 0.95,
                     stat.learn.method = "rf",
                     cv.iterations = 300)
@@ -694,7 +694,7 @@ pre.scores <- diag.pre$importance.scores
 post.scores <- diag.post$scores
 post.scores$significant <- ifelse(test = post.scores$cohens.d.L <= 0
                                   & post.scores$cohens.d.H >= 0,
-                                  yes = F, no = T)
+                                  yes = FALSE, no = TRUE)
 @
 
 
@@ -732,12 +732,16 @@ reduction). We might also select a more conservative threshold such as 500
 <<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=4>>=
 ggplot(data = post.scores)+
   geom_errorbar(aes(x = anchor.point, ymin = cohens.d.L, ymax = cohens.d.H),
-                col = "gray", width = 10)+
+                col = "gray", width = 0.1)+
   geom_point(aes(x = anchor.point, y = cohens.d, col = significant), size = 2)+
   geom_hline(yintercept = 0, linetype = "dashed", col = "gray")+
   theme_bw(base_size = 16)+
   xlab(label = "Rank")+
-  ylab(label = "Cohen's d (with 99% HDI)")
+  ylab(label = "Cohen's d (with 99% HDI)")+
+  scale_x_continuous(trans = "log10", breaks = c(1, 10, 100, 1000, 10000),
+                     labels = c(1, 10, 100, 1000, 10000))+
+  annotation_logticks(sides = "b")+
+  theme(legend.position = "top")
 @
 \end{figure}
 

@@ -44,8 +44,8 @@ getGenphenData <- function(genotype, phenotype,
     }
 
     # empirical mean and SD
-    E_mu <- mean(E_mu, na.rm = T)
-    E_sigma <- mean(E_sigma, na.rm = T)
+    E_mu <- mean(E_mu, na.rm = TRUE)
+    E_sigma <- mean(E_sigma, na.rm = TRUE)
     for(i in 1:length(out)) {
       out[[i]]$E_mu <- E_mu
       out[[i]]$E_sigma <- E_sigma
@@ -94,6 +94,7 @@ getGenphenData <- function(genotype, phenotype,
 
 
 # Description:
+# @Deprecated
 # Get genotype-phenotype data in format for stan
 getCompleteGenphenData <- function(genotype,
                                    phenotype,
@@ -102,7 +103,7 @@ getCompleteGenphenData <- function(genotype,
   out.data <- c()
   for(i in 1:ncol(genotype)) {
     s.data <- data.frame(S = i, genotype = genotype[, i],
-                         Y = phenotype, stringsAsFactors = F)
+                         Y = phenotype, stringsAsFactors = FALSE)
     out.data <- rbind(out.data, s.data)
   }
 
@@ -111,7 +112,7 @@ getCompleteGenphenData <- function(genotype,
 
   # as factor -> as numeric
   out.data$X <- as.numeric(as.factor(out.data$X))
-  out.data <- out.data[order(out.data$X, decreasing = F), ]
+  out.data <- out.data[order(out.data$X, decreasing = FALSE), ]
 
   # I -> counter
   out.data$I <- 1
@@ -1211,8 +1212,9 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
 # Description:
 # Computes a Bayesian t-test
 runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
-                          mcmc.warmup, mcmc.cores, hdi.level,
-                          model.stan) {
+                          mcmc.warmup, mcmc.cores, hdi.level, model.stan,
+                          with.rpa = FALSE, rpa.iterations = 0,
+                          rpa.rope = 0) {
 
   # get initial parameter values
   posterior <- sampling(object = model.stan,
@@ -1266,6 +1268,7 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
   # posterior data
   posterior <- data.frame(extract(posterior))
   statistics.out <- c()
+  ppc.out <- c()
   for(i in 1:(max(data.list$X) - 1)) {
     for(j in (i + 1):max(data.list$X)) {
       # general data
@@ -1315,6 +1318,21 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
       bc <- bhat$bc
 
 
+      # inferred vs real means
+      ppc.row <- data.frame(site = site,
+                            general = general,
+                            inferred.mu.i = mean(mu.i),
+                            inferred.mu.j = mean(mu.j),
+                            real.mu.i = mean(data.list$Y[data.list$X == i]),
+                            real.mu.j = mean(data.list$Y[data.list$X == j]),
+                            inferred.sigma.i = sd(mu.i),
+                            inferred.sigma.j = sd(mu.j),
+                            real.sigma.i = sd(data.list$Y[data.list$X == i]),
+                            real.sigma.j = sd(data.list$Y[data.list$X == j]),
+                            inferred.nu = mean(nu))
+      ppc.out <- rbind(ppc.out, ppc.row)
+
+
       stats <- data.frame(site = site,
                           general = general,
                           mutation = mutation,
@@ -1331,8 +1349,25 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
     }
   }
 
+  # special case for RPA
+  rpa.out <- NULL
+  if(with.rpa == TRUE) {
+    rpa.out <- getRpaContinuous(data.list = data.list,
+                                hdi.level = hdi.level,
+                                rpa.iterations = rpa.iterations,
+                                rpa.rope = rpa.rope,
+                                posterior = posterior,
+                                model.stan = model.stan,
+                                mcmc.warmup = mcmc.warmup,
+                                mcmc.iterations = mcmc.iterations,
+                                mcmc.chains = mcmc.chains,
+                                mcmc.cores = mcmc.cores)
+  }
+
   return (list(statistics.out = statistics.out,
-               convergence.out = convergence.out))
+               convergence.out = convergence.out,
+               rpa.out = rpa.out,
+               ppc.out = ppc.out))
 }
 
 
@@ -1341,8 +1376,9 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
 # Description:
 # Computes a Bayesian odds-ratio test
 runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
-                           mcmc.warmup, mcmc.cores, hdi.level,
-                           model.stan) {
+                           mcmc.warmup, mcmc.cores, hdi.level, model.stan,
+                           with.rpa = FALSE, rpa.iterations = 0,
+                           rpa.rope = 0) {
 
 
   # get initial parameter values
@@ -1393,6 +1429,7 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
   # posterior data
   posterior <- data.frame(extract(posterior))
   statistics.out <- c()
+  ppc.out <- c()
   for(i in 1:(max(data.list$X) - 1)) {
     for(j in (i + 1):max(data.list$X)) {
       # general data
@@ -1422,18 +1459,21 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
 
 
       # Bhat coeff
-      # ppc.i <- numeric(length = nrow(posterior))
-      # ppc.j <- numeric(length = nrow(posterior))
-      # for(p in 1:nrow(posterior)) {
-      #   ppc.i[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.i[p]))
-      #   ppc.j[p] <- mean(stats::rbinom(n = 100, size = 1, prob = mu.j[p]))
-      # }
-
-      # Bhat coeff
       ppc.i <- stats::rbinom(n = 10^6, prob = mean(mu.i), size = n.i)/n.i
       ppc.j <- stats::rbinom(n = 10^6, prob = mean(mu.j), size = n.j)/n.j
       bhat <- getBhattacharyya(x = ppc.i, y = ppc.j)
       bc <- bhat$bc
+
+
+      # inferred vs real means
+      ppc.row <- data.frame(site = site,
+                            general = general,
+                            inferred.mu.i = mean(mu.i),
+                            inferred.mu.j = mean(mu.j),
+                            real.mu.i = mean(data.list$Y[data.list$X == i]),
+                            real.mu.j = mean(data.list$Y[data.list$X == j]))
+      ppc.out <- rbind(ppc.out, ppc.row)
+
 
       stats <- data.frame(site = site,
                           general = general,
@@ -1447,8 +1487,25 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
     }
   }
 
+  # special case for RPA
+  rpa.out <- NULL
+  if(with.rpa == TRUE) {
+    rpa.out <- getRpaDichotomous(data.list = data.list,
+                                 hdi.level = hdi.level,
+                                 rpa.iterations = rpa.iterations,
+                                 rpa.rope = rpa.rope,
+                                 posterior = posterior,
+                                 model.stan = model.stan,
+                                 mcmc.warmup = mcmc.warmup,
+                                 mcmc.iterations = mcmc.iterations,
+                                 mcmc.chains = mcmc.chains,
+                                 mcmc.cores = mcmc.cores)
+  }
+
   return (list(statistics.out = statistics.out,
-               convergence.out = convergence.out))
+               convergence.out = convergence.out,
+               rpa.out = rpa.out,
+               ppc.out = ppc.out))
 }
 
 
@@ -1501,7 +1558,7 @@ getPhyloBias <- function(genotype, k.matrix) {
       mean.d.f <- mean(k.matrix[genotype[, i] == g, genotype[, i] == g])
 
       row <- data.frame(site = i, genotype = g, feature.dist = mean.d.f,
-                        total.dist = mean.d.t, stringsAsFactors = F)
+                        total.dist = mean.d.t, stringsAsFactors = FALSE)
       phylo.bias <- rbind(phylo.bias, row)
     }
   }
@@ -1511,6 +1568,217 @@ getPhyloBias <- function(genotype, k.matrix) {
 
 
 
+
+
+# Description:
+# Given an estimate mean (M) and HDI with low (L) and high (H) intervals, as
+# well as a ROPE interval, check if the estimated interval overlaps with the
+# ROPE interval.
+getRopeTest <- function(ROPE, M, L, H) {
+  # min ROPE = 0
+  o <- ifelse(test = L <= 0 & H >= 0, yes = "fail", no = "pass")
+
+  # for ROPE > 0
+  if(ROPE > 0 & o == "pass") {
+    abs.L <- ifelse(test = M > 0, yes = L, no = abs(H))
+    o <- ifelse(test = abs.L <= ROPE, yes = "fail", no = "pass")
+  }
+
+  return (o)
+}
+
+
+
+
+
+# Description:
+# RPA for continuous data
+getRpaContinuous <- function(data.list, hdi.level, rpa.iterations,
+                             rpa.rope, posterior, model.stan,
+                             mcmc.iterations, mcmc.warmup,
+                             mcmc.chains, mcmc.cores) {
+
+  # get subset of posterior
+  rpa.i <- sample(x = 1:nrow(posterior), size = rpa.iterations, replace = TRUE)
+  posterior <- posterior[rpa.i, ]
+
+  # posterior data
+  statistics.out <- c()
+  for(i in 1:(max(data.list$X) - 1)) {
+    for(j in (i + 1):max(data.list$X)) {
+      # general data
+      site <- data.list$site
+      n.i <- data.list$Ng[i]
+      n.j <- data.list$Ng[j]
+      g.i <- data.list$G[data.list$X == i][1]
+      g.j <- data.list$G[data.list$X == j][1]
+      mutation <- paste(g.i, "->", g.j, sep = '')
+      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
+      rpa.counter <- 0
+
+      for(k in 1:nrow(posterior)) {
+        mu.i <- posterior[k, paste("mu.", i, sep = '')]
+        sigma.i <- posterior[k, paste("sigma.", i, sep = '')]
+        mu.j <- posterior[k, paste("mu.", j, sep = '')]
+        sigma.j <- posterior[k, paste("sigma.", j, sep = '')]
+        nu <- posterior[k, "nu"]
+
+        # simulate new data
+        ppc.i <- mu.i+sigma.i*stats::rt(n = n.i, df = nu)
+        ppc.j <- mu.j+sigma.j*stats::rt(n = n.j, df = nu)
+
+
+        # new data for stan
+        phenotype <- c(ppc.i, ppc.j)
+        genotype <- matrix(c(rep(x = g.i, times = length(ppc.i)),
+                             rep(x = g.j, times = length(ppc.j))),
+                           ncol = 1)
+        ppc.data.list <- getGenphenData(genotype = genotype,
+                                        phenotype = phenotype,
+                                        phenotype.type = "continuous",
+                                        min.observations = 3)
+
+        # get initial parameter values
+        ppc.posterior <- sampling(object = model.stan,
+                                  data = ppc.data.list[[1]],
+                                  pars = c("mu", "sigma", "nu"),
+                                  iter = mcmc.iterations,
+                                  warmup = mcmc.warmup,
+                                  chains = mcmc.chains,
+                                  cores = mcmc.cores,
+                                  control = list(adapt_delta = 0.95,
+                                                 max_treedepth = 10),
+                                  verbose = FALSE,
+                                  refresh = -1)
+
+        # extract posterior
+        ppc.posterior <- data.frame(extract(ppc.posterior))
+        ppc.mu.i <- ppc.posterior[, "mu.1"]
+        ppc.sigma.i <- ppc.posterior[, "sigma.1"]
+        ppc.mu.j <- ppc.posterior[, "mu.2"]
+        ppc.sigma.j <- ppc.posterior[, "sigma.2"]
+
+        # cohen's d
+        cohens.d <- (ppc.mu.i-ppc.mu.j)/sqrt((ppc.sigma.i^2+ppc.sigma.j^2)/2)
+        M <- mean(cohens.d)
+        cohens.d.hdi <- getHdi(vec = cohens.d, hdi.level = hdi.level)
+        L = cohens.d.hdi[1]
+        H = cohens.d.hdi[2]
+
+        # compute if significant -> increment counter
+        rpa <- getRopeTest(ROPE = rpa.rope, M = M, L = L, H = H)
+        rpa.counter <- rpa.counter + sum(rpa == "pass")
+      }
+
+
+      # collect
+      stats <- data.frame(site = site,
+                          general = general,
+                          mutation = mutation,
+                          rpa.counter = rpa.counter)
+      statistics.out <- rbind(statistics.out, stats)
+    }
+  }
+
+  return (statistics.out)
+}
+
+
+
+
+# Description:
+# RPA for dichotomous data
+getRpaDichotomous <- function(data.list, hdi.level, rpa.iterations,
+                              rpa.rope, posterior, model.stan,
+                              mcmc.iterations, mcmc.warmup,
+                              mcmc.chains, mcmc.cores) {
+
+  # get subset of posterior
+  rpa.i <- sample(x = 1:nrow(posterior), size = rpa.iterations, replace = TRUE)
+  posterior <- posterior[rpa.i, ]
+
+  # posterior data
+  statistics.out <- c()
+  for(i in 1:(max(data.list$X) - 1)) {
+    for(j in (i + 1):max(data.list$X)) {
+      # general data
+      site <- data.list$site
+      n.i <- data.list$Ng[i]
+      n.j <- data.list$Ng[j]
+      g.i <- data.list$G[data.list$X == i][1]
+      g.j <- data.list$G[data.list$X == j][1]
+      mutation <- paste(g.i, "->", g.j, sep = '')
+      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
+      rpa.counter <- 0
+
+      for(k in 1:nrow(posterior)) {
+        mu.i <- posterior[k, paste("mu.", i, sep = '')]
+        mu.j <- posterior[k, paste("mu.", j, sep = '')]
+
+        # simulate new data
+        ppc.i <- stats::rbinom(n = n.i, prob = mu.i, size = 1)
+        ppc.j <- stats::rbinom(n = n.j, prob = mu.j, size = 1)
+
+        # new data for stan
+        phenotype <- c(ppc.i, ppc.j)
+        genotype <- matrix(c(rep(x = g.i, times = length(ppc.i)),
+                             rep(x = g.j, times = length(ppc.j))),
+                           ncol = 1)
+        ppc.data.list <- getGenphenData(genotype = genotype,
+                                        phenotype = phenotype,
+                                        phenotype.type = "dichotomous",
+                                        min.observations = 3)
+
+        # get initial parameter values
+        ppc.posterior <- sampling(object = model.stan,
+                                  data = ppc.data.list[[1]],
+                                  pars = c("mu"),
+                                  iter = mcmc.iterations,
+                                  warmup = mcmc.warmup,
+                                  chains = mcmc.chains,
+                                  cores = mcmc.cores,
+                                  control = list(adapt_delta = 0.95,
+                                                 max_treedepth = 10),
+                                  verbose = FALSE,
+                                  refresh = -1)
+
+        # extract posterior
+        ppc.posterior <- data.frame(extract(ppc.posterior))
+        ppc.mu.i <- ppc.posterior[, "mu.1"]
+        ppc.mu.j <- ppc.posterior[, "mu.2"]
+
+        # absolute d
+        absolute.d <- ppc.mu.i - ppc.mu.j
+        absolute.d.hdi <- getHdi(vec = absolute.d, hdi.level = hdi.level)
+        M <- mean(absolute.d)
+        L <- absolute.d.hdi[1]
+        H <- absolute.d.hdi[2]
+
+        # compute if significant -> increment counter
+        rpa <- getRopeTest(ROPE = rpa.rope, M = M, L = L, H = H)
+        rpa.counter <- rpa.counter + sum(rpa == "pass")
+      }
+
+
+      # collect
+      stats <- data.frame(site = site,
+                          general = general,
+                          mutation = mutation,
+                          rpa.counter = rpa.counter)
+      statistics.out <- rbind(statistics.out, stats)
+    }
+  }
+
+  return (statistics.out)
+}
+
+
+
+# Description:
+# Posterior predictive check
+getPpc <- function() {
+
+}
 
 
 

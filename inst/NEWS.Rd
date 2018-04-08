@@ -21,6 +21,7 @@
       \item Procedure for data reduction (runDiagnostics) added
       \item Tutorial updated
       \item Simple procedure for phylogenetic bias estimation implemented
+      \item Retrospective power analysis module
     }
   }
 

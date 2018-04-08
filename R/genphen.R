@@ -1,5 +1,7 @@
 
 
+
+
 runGenphen <- function(genotype = NULL,
                        phenotype = NULL,
                        phenotype.type = NULL,
@@ -9,7 +11,10 @@ runGenphen <- function(genotype = NULL,
                        mcmc.cores = 1,
                        hdi.level = 0.95,
                        stat.learn.method = "rf",
-                       cv.iterations = 1000) {
+                       cv.iterations = 1000,
+                       with.rpa = FALSE,
+                       rpa.iterations = 0,
+                       rpa.rope = 0) {
 
   # check inputs
   checkInput(genotype = genotype,
@@ -48,43 +53,44 @@ runGenphen <- function(genotype = NULL,
   convergence <- NULL
   results <- NULL
   cas <- NULL
+  rpa <- NULL
+  ppc <- NULL
   for(s in 1:length(genphen.data)) {
     if(phenotype.type == "continuous") {
 
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
-      cat("============================================================= \n")
       cat("======== Main Analysis Progress: ", progress.indicator, "% ",
           "site = ", genphen.data[[s]]$site, "======== \n")
-      cat("============================================================= \n")
       o <- runContinuous(data.list = genphen.data[[s]],
                          mcmc.chains = mcmc.chains,
                          mcmc.iterations = mcmc.iterations,
                          mcmc.warmup = mcmc.warmup,
                          mcmc.cores = mcmc.cores,
                          hdi.level = hdi.level,
-                         model.stan = model.stan)
+                         model.stan = model.stan,
+                         with.rpa = with.rpa,
+                         rpa.iterations = rpa.iterations,
+                         rpa.rope = rpa.rope)
     }
     else if(phenotype.type == "dichotomous") {
       progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
-      cat("============================================================= \n")
       cat("======== Main Analysis Progress: ", progress.indicator, "% ",
           "site = ", genphen.data[[s]]$site, "======== \n")
-      cat("============================================================= \n")
       o <- runDichotomous(data.list = genphen.data[[s]],
                           mcmc.chains = mcmc.chains,
                           mcmc.iterations = mcmc.iterations,
                           mcmc.warmup = mcmc.warmup,
                           mcmc.cores = mcmc.cores,
                           hdi.level = hdi.level,
-                          model.stan = model.stan)
+                          model.stan = model.stan,
+                          with.rpa = with.rpa,
+                          rpa.iterations = rpa.iterations,
+                          rpa.rope = rpa.rope)
     }
 
 
 
-    cat("============================================================= \n")
     cat("=================== Statistical Learning ==================== \n")
-    cat("============================================================= \n")
-
     # CA
     if(stat.learn.method == "none") {
       ca <- getNoneCa(data.list = genphen.data[[s]])
@@ -110,6 +116,8 @@ runGenphen <- function(genotype = NULL,
     results <- rbind(results, o$statistics.out)
     cas <- rbind(cas, ca)
     convergence <- rbind(convergence, o$convergence.out)
+    rpa <- rbind(rpa, o$rpa.out)
+    ppc <- rbind(ppc, o$ppc.out)
   }
 
 
@@ -134,9 +142,10 @@ runGenphen <- function(genotype = NULL,
   }
   return(list(scores = nice.scores,
               convergence = convergence,
-              debug.scores = scores))
+              debug.scores = scores,
+              rpa = rpa,
+              ppc = ppc))
 }
-
 
 
 
@@ -243,7 +252,10 @@ runDiagnostics <- function(genotype = NULL,
                              mcmc.warmup = mcmc.warmup,
                              mcmc.cores = mcmc.cores,
                              hdi.level = hdi.level,
-                             model.stan = model.stan)
+                             model.stan = model.stan,
+                             with.rpa = FALSE,
+                             rpa.iterations = 0,
+                             rpa.rope = 0)
         }
         else if(phenotype.type == "dichotomous") {
           o <- runDichotomous(data.list = genphen.data[[s]],
@@ -252,7 +264,10 @@ runDiagnostics <- function(genotype = NULL,
                               mcmc.warmup = mcmc.warmup,
                               mcmc.cores = mcmc.cores,
                               hdi.level = hdi.level,
-                              model.stan = model.stan)
+                              model.stan = model.stan,
+                              with.rpa = FALSE,
+                              rpa.iterations = 0,
+                              rpa.rope = 0)
         }
 
 
@@ -346,6 +361,5 @@ runPhyloBiasCheck <- function(input.kinship.matrix = NULL,
                kinship.matrix = kinship.matrix,
                bias.mutations = bias.mutations))
 }
-
 
 

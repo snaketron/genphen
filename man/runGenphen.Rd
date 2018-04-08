@@ -24,9 +24,11 @@ association scores using Bayesian inference and statistical learning.
 
 
 \usage{
-runGenphen(genotype, phenotype, phenotype.type, mcmc.chains,
-           mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-           stat.learn.method, cv.iterations)
+runGenphen(genotype, phenotype, phenotype.type,
+           mcmc.chains, mcmc.iterations, mcmc.warmup,
+           mcmc.cores, hdi.level, stat.learn.method,
+           cv.iterations, with.rpa, rpa.iterations,
+           rpa.rope)
 }
 
 
@@ -49,6 +51,9 @@ learning method used in the analysis. Currently two methods are available:
 random forest ('rf') and support vector machine ('svm'). For no statistical
 learning select 'none'.}
 \item{cv.iterations}{cross-validation iterations (default = 1,000).}
+\item{with.rpa}{with retrospective power analysis (RPA).}
+\item{rpa.iterations}{Number of simulation used to compute RPA scores.}
+\item{rpa.rope}{Region of practical equivalence (ROPE) for the RPA.}
 }
 
 
@@ -145,6 +150,24 @@ simulation for each parameter}
 each parameter}
 \item{divergence}{Indicator of occuring divergences during the MCMC simulation}
 \item{treedepth}{Indicator of treedepth exceptions during the MCMC simulation}
+
+
+
+\bold{RPA parameters:}
+\item{s, g, n}{s=site, g=genotype, n=number of observations}
+\item{rpa.count}{Number of RPA runs in which a significant effect was found}
+
+
+
+\bold{Posterior predictive check parameters:}
+\item{s, g, n}{s=site, g=genotype, n=number of observations}
+\item{inferred.mu.i, inferred.mu.j, real.mu.i, real.mu.j}{Inferred and real
+means in each group of a SNP}
+\item{inferred.sigma.i, inferred.sigma.j, real.sigma.i, real.sigma.j}{Inferred
+and real standard deviations in each group of a SNP (only for continuous
+phenotypes)}
+\item{inferred.nu}{Inferred shape of the t-distribution(only for continuous
+phenotypes)}
 }
 
 \author{
@@ -171,7 +194,10 @@ continuous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
                                   mcmc.cores = 2,
                                   hdi.level = 0.95,
                                   stat.learn.method = "rf",
-                                  cv.iterations = 500)
+                                  cv.iterations = 500,
+                                  with.rpa = FALSE,
+                                  rpa.iterations = 100,
+                                  rpa.rope = 0)
 
 # II: Dichotomous phenotype analysis
 
@@ -190,7 +216,10 @@ dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
                                    mcmc.cores = 2,
                                    hdi.level = 0.95,
                                    stat.learn.method = "rf",
-                                   cv.iterations = 500)
+                                   cv.iterations = 500,
+                                   with.rpa = FALSE,
+                                   rpa.iterations = 100,
+                                   rpa.rope = 0)
 }
 
 
