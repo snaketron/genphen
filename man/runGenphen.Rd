@@ -161,13 +161,8 @@ each parameter}
 
 \bold{Posterior predictive check parameters:}
 \item{s, g, n}{s=site, g=genotype, n=number of observations}
-\item{inferred.mu.i, inferred.mu.j, real.mu.i, real.mu.j}{Inferred and real
-means in each group of a SNP}
-\item{inferred.sigma.i, inferred.sigma.j, real.sigma.i, real.sigma.j}{Inferred
-and real standard deviations in each group of a SNP (only for continuous
-phenotypes)}
-\item{inferred.nu}{Inferred shape of the t-distribution(only for continuous
-phenotypes)}
+\item{predicted.mu.i, predicted.mu.j, real.mu.i, real.mu.j}{Predicted and
+real means in each group of a SNP}
 }
 
 \author{

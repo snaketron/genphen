@@ -745,7 +745,5 @@ ggplot(data = post.scores)+
 @
 \end{figure}
 
-\subsection{Data Augmentation}
-\subsection{Gene Prioritization}
 
 \end{document}

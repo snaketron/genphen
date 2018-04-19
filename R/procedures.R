@@ -690,12 +690,12 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
                          round(x = kappa.H, digits = 2), ")", sep = '')
 
       return(list(ca = mean(cas, na.rm = TRUE),
-                  ca.L = update.ca.L,
-                  ca.H = update.ca.H,
+                  ca.L = ca.L,
+                  ca.H = ca.H,
                   ca.hdi = ca.hdi,
                   kappa = mean(kappas, na.rm = TRUE),
-                  kappa.L = update.kappa.L,
-                  kappa.H = update.kappa.H,
+                  kappa.L = kappa.L,
+                  kappa.H = kappa.H,
                   kappa.hdi = kappa.hdi,
                   I = 1))
     }
@@ -945,12 +945,12 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
                          round(x = kappa.H, digits = 2), ")", sep = '')
 
       return(list(ca = mean(cas, na.rm = TRUE),
-                  ca.L = update.ca.L,
-                  ca.H = update.ca.H,
+                  ca.L = ca.L,
+                  ca.H = ca.H,
                   ca.hdi = ca.hdi,
                   kappa = mean(kappas, na.rm = TRUE),
-                  kappa.L = update.kappa.L,
-                  kappa.H = update.kappa.H,
+                  kappa.L = kappa.L,
+                  kappa.H = kappa.H,
                   kappa.hdi = kappa.hdi,
                   I = 1))
     }
@@ -1318,18 +1318,13 @@ runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
       bc <- bhat$bc
 
 
-      # inferred vs real means
+      # predicted vs real means
       ppc.row <- data.frame(site = site,
                             general = general,
-                            inferred.mu.i = mean(mu.i),
-                            inferred.mu.j = mean(mu.j),
+                            predicted.mu.i = mean(ppc.i),
+                            predicted.mu.j = mean(ppc.j),
                             real.mu.i = mean(data.list$Y[data.list$X == i]),
-                            real.mu.j = mean(data.list$Y[data.list$X == j]),
-                            inferred.sigma.i = sd(mu.i),
-                            inferred.sigma.j = sd(mu.j),
-                            real.sigma.i = sd(data.list$Y[data.list$X == i]),
-                            real.sigma.j = sd(data.list$Y[data.list$X == j]),
-                            inferred.nu = mean(nu))
+                            real.mu.j = mean(data.list$Y[data.list$X == j]))
       ppc.out <- rbind(ppc.out, ppc.row)
 
 
@@ -1465,11 +1460,11 @@ runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
       bc <- bhat$bc
 
 
-      # inferred vs real means
+      # predicted vs real means
       ppc.row <- data.frame(site = site,
                             general = general,
-                            inferred.mu.i = mean(mu.i),
-                            inferred.mu.j = mean(mu.j),
+                            predicted.mu.i = mean(ppc.i),
+                            predicted.mu.j = mean(ppc.j),
                             real.mu.i = mean(data.list$Y[data.list$X == i]),
                             real.mu.j = mean(data.list$Y[data.list$X == j]))
       ppc.out <- rbind(ppc.out, ppc.row)
