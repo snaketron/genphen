@@ -586,8 +586,9 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
 getRfCa <- function(genphen.data, cv.fold, 
                     cv.steps, hdi.level, 
                     ntree) {
+
   
-  
+    
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence
   # is met before the number of steps is hit.
@@ -776,7 +777,8 @@ getRfCa <- function(genphen.data, cv.fold,
   Y <- genphen.data$X
   
   
-  if(length(unique(X)) < 2) {
+  MIN.OBS <- 3
+  if(length(unique(X)) < 2 | all(table(Y) < MIN.OBS)) {
     # pack dummy output, as at least a two-category predictor is needed
     # to run the incremental learning procedure
     class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, 
@@ -1001,8 +1003,8 @@ getSvmCa <- function(genphen.data, cv.fold,
   X <- genphen.data$Y
   Y <- genphen.data$X
   
-  
-  if(length(unique(X)) < 2) {
+  MIN.OBS <- 3
+  if(length(unique(X)) < 2 | all(table(Y) < MIN.OBS)) {
     # pack dummy output, as at least a two-category predictor is needed
     # to run the incremental learning procedure
     class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, kappa = NA, 

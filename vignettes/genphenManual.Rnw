@@ -441,13 +441,13 @@ Next, we perform the genetic association study for \underline{continuous}
 phenotypes with \texttt{genphen} using the following settings:
 \begin{itemize}
 \item \underline{hierarchical} Bayesian model will be run with \underline{2 MCMC 
-chains} composed of \underline{2500 iterations} each, including \underline{500 
+chains} composed of \underline{1500 iterations} each, including \underline{500 
 warmup iterations}. 
 \item \underline{Random forest} was selected as for the statistical learning, 
-which will be run in a cross-validation mode with \underline{300 iterations}. 
+which will be run in a cross-validation mode with \underline{200 iterations}. 
 \item All estimates will be reported according to their mean and \underline{95\% 
 HDI} 
-\item Retrospective power analysis with \underline{10 iterations} will be 
+\item Retrospective power analysis with \underline{5 iterations} will be 
 performed. 
 \item The resulting \underline{stan object} will be returned for debugging.
 \item Whenever possible, \underline{2 cores} will be used.
@@ -466,8 +466,8 @@ c.out <- genphen::runGenphen(genotype = genotype.saap[, 80:86],
                              cores = 2,
                              hdi.level = 0.95,
                              stat.learn.method = "rf",
-                             cv.iterations = 300,
-                             rpa.iterations = 10,
+                             cv.iterations = 200,
+                             rpa.iterations = 5,
                              with.stan.obj = TRUE)
 @
 \end{scriptsize}
@@ -842,7 +842,7 @@ Next, we perform the genetic association study for \underline{dichotomous}
 phenotypes with \texttt{genphen} using the following settings:
 \begin{itemize}
 \item \underline{univariate} Bayesian model will be run with \underline{2 MCMC 
-chains} composed of \underline{2500 iterations} each, including \underline{500 
+chains} composed of \underline{1500 iterations} each, including \underline{500 
 warmup iterations}. 
 \item \underline{Random forest} was selected as for the statistical learning, 
 which will be run in a cross-validation mode with \underline{500 iterations}.
@@ -861,12 +861,12 @@ d.out <- genphen::runGenphen(genotype = genotype.snp,
                              phenotype.type = "dichotomous",
                              model.type = "univariate",
                              mcmc.chains = 2,
-                             mcmc.iterations = 2500,
+                             mcmc.iterations = 1500,
                              mcmc.warmup = 500,
                              cores = 2,
                              hdi.level = 0.95,
                              stat.learn.method = "rf",
-                             cv.iterations = 500,
+                             cv.iterations = 200,
                              rpa.iterations = 0,
                              with.stan.obj = FALSE)
 @
@@ -1018,7 +1018,7 @@ diag <- genphen::runDiagnostics(genotype = gen,
                                 phenotype.type = "continuous",
                                 rf.trees = 50000,
                                 mcmc.chains = 2,
-                                mcmc.iterations = 2500,
+                                mcmc.iterations = 1500,
                                 mcmc.warmup = 500,
                                 cores = 2,
                                 hdi.level = 0.95,
@@ -1062,8 +1062,8 @@ g
 
 By visualizing the estimated slope coefficients of the diagnosed SNPs, we can 
 observe an enrichment of non-informative (statistically not-significant) SNPs 
-beyond the rank of 1000. We can thus narrow down our interval of interest to
-the top-ranked 2500 SNPs, yielding massive data reduction of 95\%, while still
+beyond the rank of 1,000. We can thus narrow down our interval of interest to
+the top-ranked 2,500 SNPs, yielding massive data reduction of 95\%, while still
 retaining many SNPs with small effects.
 
 
