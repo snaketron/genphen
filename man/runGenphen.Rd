@@ -24,11 +24,10 @@ association scores using Bayesian inference and statistical learning.
 
 
 \usage{
-runGenphen(genotype, phenotype, phenotype.type,
+runGenphen(genotype, phenotype, phenotype.type, model.type,
            mcmc.chains, mcmc.iterations, mcmc.warmup,
-           mcmc.cores, hdi.level, stat.learn.method,
-           cv.iterations, with.rpa, rpa.iterations,
-           rpa.rope)
+           cores, hdi.level, stat.learn.method,
+           cv.iterations, rpa.iterations, with.stan.obj)
 }
 
 
@@ -38,22 +37,24 @@ as columns or alternatively as DNAMultipleAlignment or AAMultipleAlignment
 Biostrings object.}
 \item{phenotype}{Numerical vector for continuous-phenotype analysis, numerical
 or character vector for dichotonous-phenotype analysis.}
-\item{phenotype.type}{'continuous' or 'dichotomous' based on phenotype type.}
+\item{phenotype.type}{'continuous' or 'dichotomous' depending on the type of
+the phenotype.}
+\item{model.type}{'univariate' or 'hierarchical'}
 \item{mcmc.chains}{Number of MCMC chains used to test each association test.
 We recomend mcmc.chains >= 2.}
 \item{mcmc.iterations}{Length of MCMC chains (default = 1,000).}
 \item{mcmc.warmup}{Length of adaptive MCMC chains (default = 500).}
-\item{mcmc.cores}{Number of cores used for the MCMC (default = 1). The same
-parameter is for multicore execution of the statistical learning procedures.}
+\item{cores}{Number of cores to use (default = 1).}
 \item{hdi.level}{Highest density interval (HDI) (default = 0.95).}
 \item{stat.learn.method}{Character parameter used to specify the statistical
 learning method used in the analysis. Currently two methods are available:
 random forest ('rf') and support vector machine ('svm'). For no statistical
 learning select 'none'.}
 \item{cv.iterations}{cross-validation iterations (default = 1,000).}
-\item{with.rpa}{with retrospective power analysis (RPA).}
-\item{rpa.iterations}{Number of simulation used to compute RPA scores.}
-\item{rpa.rope}{Region of practical equivalence (ROPE) for the RPA.}
+\item{rpa.iterations}{Number of retrospective power analysis (RPA) iterations 
+to be computed. If rpa.iterations = 0, no RPA will be performed.}
+\item{with.stan.obj}{Logical indicator specifying whether the used stan objects
+should be returrned (default = FALSE, the stan objects can be large).}
 }
 
 
@@ -62,8 +63,17 @@ learning select 'none'.}
 Input:
 \itemize{
 \item{genotype}
-P genotypes of N individuals in the form of NxP character matrix/data frame or
-vector (if P = 1).
+genotype data (e.g. set of 1,000 SNPs found along the aligned genomes of
+10 individuals) - provided in one of three possible input types: 
+\itemize{
+  \item character vector of length N if only a single SNP/SAAP is 
+  ment to be analyzed, containing the genotypes of N individuals.
+  \item character matrix with dimensions NxM whereby the M columns represent 
+  different SNPs or SAAPs, and the N rows represent different individuals for 
+  which we have some measured phenotype.
+  \item AAMultipleAlignment or DNAMultipleAlignment object; if the genotype 
+  data is a multiple sequence alignment composed of N sequences.
+}
 \item{phenotype}
 phenotypes of N individuals in the form of a N-sized vector. The type of the
 phenotype can either be continuous or dichotomous. Therefore, genphen has two
@@ -74,101 +84,104 @@ design of the Bayesian hierarchical model which are used.
 Goal: To quantify the association between each genotype and phenotype. With
 genphen, we provide several measures of association:
 \itemize{
-\item{Classification accuracy (CA): it is a metric obtained with a statistical
-learning technique such as random forest (RF) or support vector machine (SVM),
-and measures the degree of accuracy with which one can classify (predict) the
-alleles of an SNP from the phenotype measurements. If there exists a strong
-association between a particular SNP and the phenotype, one should be able to
-build a statistical model which accurately classifies the two alleles of that
-SNP solely from the phenotype data (CA approx. 1). Otherwise, the classification
-accuracy of statistical model should be approximately similar to that of simple
-guessing (CA approx. 0.5). Promising SNPs thus have a high CA close to 1.
+\item{Classification accuracy (CA): CA measures the degree of accuracy with 
+which one can classify (predict) the alleles of a SNP from the phenotype. If 
+there exists a strong association between a particular SNP and the phenotype, 
+one should be able to train a statistical model (using RF or SVM) which 
+accurately classifies the two alleles of that SNP solely from the phenotype 
+data (CA close to 1). Otherwise, the model should perform poorly, with the 
+classification accuracy of the model being approximately similar to that of 
+simple guessing (CA close to 0.5)}
 
-For each CA estimate, we also compute a corresponding Cohen's kappa statistic.
-With Cohen's kappa we compare the observed CA with the classification accuracy
-which is expected simply by chance (CA_exp). This is in particular useful when
-the genetic states of the genotype are not evenly represented, i.e. allele A of
-a given SNP may be represented in 80\% of the individ-uals, while the other
-allele T may be represented in only 20\% of the individuals. Such an uneven
-composition of the genotype can affect the classification analysis, potentially
-resulting in high CA simply because the classifier only predicts the dominant
-allele. Promising SNPs have high Cohen's kappa close to 1.}
+\item{Cohen's kappa statistic: There is one pitfall where the CA estimate 
+can be misleading, and this is the case when the analyzed SNP is composed of 
+unevenly represented genetic states (alleles). For instance, the allele A of 
+a given SNP is found in 90\% of the individuals, while the other allele T in 
+only 10\%. Such an uneven composition of the alleles can lead to misleading 
+results, i.e. even without proper learning the algorithm can produce a high 
+$CA close to 0.9 simply by always predicting the dominant label. The kappa 
+statistics is a quality metric, which is to be used together with CA. Cohen 
+defines the following meaningful kappa intervals: [kappa<0]: ``no agreement'', 
+[0.0-0.2]: ``slight agreement'', [0.2-0.4]: ``fair agreement'', [0.4-0.6]: 
+``moderate agreement'', [0.6-0.8]: ``substantial agreement'' and [0.8-1.0]: 
+``almost perfect agreement''.}
 
-\item{Effect size: for each SNP we compute the effect size, i.e. the size of
-the difference in phenotype observed between its alleles (amino acids in the
-case of SAAP). Depending on the type of the phenotype, we either compute the
-Cohen's d effect size for continuous phenotypes, or the absolute effect size
-for dichotomous phenotypes. We first use Byesian inference to infer the
-parameters of the distribution of the phenotype in each allele, and then plug
-the posterior distribution of these parameters into the corresponding equations
-for computing the effect size. In addition to the point estimates of the effect
-sizes, we also estimate the corresponding highest density intervals (HDIs).}
+\item{Slope coefficient (beta): for each SNP we compute beta (the main effect 
+in the generalized linear model inferred with Bayesian inference) which 
+indicates the strength of the association between the genetic states of the 
+particular SNP and the phenotype. We also compute 95\% (for instance) highest 
+density interval (HDI) of beta, which is defined as the interval that covers 
+a 95\% of the posterior distribution, with every point inside the interval 
+having a higher credibility than any point outside it. Thus we can define an 
+association as significant if the null-effect, i.e. beta = 0 lies outside 
+the 95\% HDI. We report for each parameter in the above models its posterior 
+mean and the 95\% HDI.}
 
-\item{Bhattacharyya coefficient (BC): the infered parameters needed to compute
-the effect size are used to  perform posterior predictive checks and generate
-simulated distributions of the phenotype for each allele of a given SNP (amino
-acid states in the case of SAAP). Using the Bhattacharyya coefficient, we can
-measure the overlap between any two distributions, i.e. for no or low overlap
-(weak strength of association), BC is close to 0, and BC is close to 1 for a
-complete overlap (strong strength of association).}
-
-The association scores can be correlated, i.e. when CA is close to 1, the effect
-size is large and (BC = 0). This is not always the case, i.e. we can have a
-small but significant effect size, yet a perfect CA. This is an interesting
-information which could be lost if a single association metric was used.
-Moreover, RF and SVM allow us to capture non-linear associations.
+\item{Bhattacharyya coefficient (BC): the paramters inferred during the Bayesian
+inferrence can be used to simulate new data (posterior prediction), i.e. the 
+distributions of the phenotype for each allele of a given SNP. We then used the 
+Bhattacharyya coefficient to quantify the overlap between these distributions, 
+with BC close to 0 for low overlap (strong association) and BC close to 1 for a
+complete overlap (weak association).}
 }
 }
 
 \value{
 \bold{General parameters:}
 \item{site}{id of the site (e.g. position in the provided sequence alignment)}
-\item{mutation}{type of polymorphism (e.g. T->A)}
-\item{data}{number of data points for each allele (e.g. A:10, T:20)}
+\item{g1}{first genotype of the SNP}
+\item{g0}{second genotype of the SNP}
 
 
 \bold{Association score parameters:}
-\item{cohens.d or absolute.d}{Cohen's d effect size (continuous phenotype
-analysis) or absolute effect size (dichotomous phenotype analysis).
-point estimate}
-\item{cohens.d.L/cohens.d.H or absolute.d.L/absolute.d.H}{The highest density
-interval (HDI) of the estimated effect size.}
-\item{ca, ca.L, ca.H}{Classification accuracy (CA) estimate and its HDI}
-\item{kappa, kappa.L, kappa.H}{Cohen's kappa estimate and its HDI}
-\item{bc}{Bhattacharyya coefficient, degree of overlap between the posterior
-predicted distributions of the phenotype in the two alleles of a SNP (or two
-amino acid states of an SAAP.}
-\item{sd.d, sd.d.L, sd.d.H}{(only for continuous phenotypes) Difference in
-standard deviations its HDI}
+\item{beta.mean, beta.sd, beta.L/beta.H}{Mean, standard deviation and HDI of 
+the estimated slope coefficient}
+\item{alpha.mean, alpha.sd, alpha.L/alpha.H}{Mean, standard deviation and HDI 
+of the estimated intercept coefficient}
+\item{sd.mean, sd.L/sd.H, nu.mean, nu.L/nu.H}{Standard deviation and degrees of
+freedom from the noise distribution used when analyzing continuous phenotypes,
+including HDIs of the estimated parameters}
+\item{ca, ca.L, ca.H}{CA estimate and corresponding HDI}
+\item{kappa, kappa.L, kappa.H}{Cohen's kappa and corresponding HDI}
+\item{bc}{Bhattacharyya coefficient}
 
 
 \bold{MCMC convergence parameters:}
-\item{s, g, n}{s=site, g=genotype, n=number of observations}
-\item{mu.rhat, sigma.rhat}{Potential scale reduction factor from the MCMC
-simulation for each parameter}
-\item{mu.ess, sigma.ess}{Effective sampling size from the MCMC simulation for
-each parameter}
-\item{divergence}{Indicator of occuring divergences during the MCMC simulation}
-\item{treedepth}{Indicator of treedepth exceptions during the MCMC simulation}
+\item{site, g1, g0, n1, n0}{s=site, g1=fist genotype, g0=second genotype, 
+n1=number g1 observations, n0=number of g0 observations}
+\item{par}{Parameter name in the generalized linear model}
+\item{n_ess}{Effective sampling size}
+\item{Rhat}{Potential scale reduction factor}
 
 
-
-\bold{RPA parameters:}
-\item{s, g, n}{s=site, g=genotype, n=number of observations}
-\item{rpa.count}{Number of RPA runs in which a significant effect was found}
-
+\bold{Retrospective power analysis (RPA) parameters:}
+\item{site, g1, g0, n1, n0}{s=site, g1=fist genotype, g0=second genotype, 
+n1=number g1 observations, n0=number of g0 observations}
+\item{rpa.power.error}{Ratio of RPA runs in which a statistically insignificant
+effect, i.e. slope coefficient with HDI which contain the null effect. To
+estimate power of SNP: rpa.power = 1 - rpa.power.error}
+\item{rpa.sign.error}{Ratio of RPA runs in which the slope coefficient has a 
+different sign compared to the originally estimated slope}
+\item{rpa.beta.mean}{The mean of the slope coefficients computed during the RPA}
+\item{rpa.beta.sd}{The standard deviation of the slope coefficients computed 
+during the RPA}
+\item{rpa.N}{Number of total RPA iterations}
 
 
 \bold{Posterior predictive check parameters:}
 \item{s, g, n}{s=site, g=genotype, n=number of observations}
 \item{predicted.mu.i, predicted.mu.j, real.mu.i, real.mu.j}{Predicted and
 real means in each group of a SNP}
+
+
+\bold{Stan object:}
+\item{stan.obj}{Stan object.}
 }
+
 
 \author{
   Simo Kitanovski <simo.kitanovski@uni-due.de>
 }
-
 
 
 \examples{
@@ -183,16 +196,16 @@ data(phenotype.saap)
 continuous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
                                   phenotype = phenotype.saap,
                                   phenotype.type = "continuous",
+                                  model.type = "univariate",
                                   mcmc.chains = 2,
-                                  mcmc.iterations = 2000,
+                                  mcmc.iterations = 1500,
                                   mcmc.warmup = 500,
-                                  mcmc.cores = 2,
+                                  cores = 2,
                                   hdi.level = 0.95,
                                   stat.learn.method = "rf",
-                                  cv.iterations = 500,
-                                  with.rpa = FALSE,
-                                  rpa.iterations = 100,
-                                  rpa.rope = 0)
+                                  cv.iterations = 200,
+                                  rpa.iterations = 0,
+                                  with.stan.obj = FALSE)
 
 # II: Dichotomous phenotype analysis
 
@@ -205,16 +218,16 @@ data(dichotomous.phenotype.saap)
 dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
                                    phenotype = dichotomous.phenotype.saap,
                                    phenotype.type = "dichotomous",
+                                   model.type = "univariate",
                                    mcmc.chains = 2,
-                                   mcmc.iterations = 2000,
+                                   mcmc.iterations = 1500,
                                    mcmc.warmup = 500,
-                                   mcmc.cores = 2,
+                                   cores = 2,
                                    hdi.level = 0.95,
                                    stat.learn.method = "rf",
-                                   cv.iterations = 500,
-                                   with.rpa = FALSE,
-                                   rpa.iterations = 100,
-                                   rpa.rope = 0)
+                                   cv.iterations = 200,
+                                   rpa.iterations = 0,
+                                   with.stan.obj = FALSE)
 }
 
 

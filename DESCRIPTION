@@ -2,16 +2,15 @@ Package: genphen
 Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes with Bayesian inference and statistical learning techniques
-Version: 1.9.0
-Date: 2018-04-15
+Version: 1.9.3
+Date: 2018-10-05
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
-Description: Genetic association studies are an essential tool for studying the 
-    relationship between genotypes and phenotypes and thus for the discovery of 
-    disease-causing genetic variants. With genphen we propose a new method for
-    conducting genetic association studies, using a combined approach which is 
-    based on both Bayesian inference and statistical learning techniques such as 
-    random forest and support vector machines.
+Description: Genetic association studies are an essential tool for studying 
+    the relationship between genotypes and phenotypes. With genphen we can 
+    quantify the association between genotypes and phenotypes using a hybrid 
+    method which uses statistical learning techniques such as random forest and 
+    support vector machines, and Bayesian inference using hierarchical models. 
 License: GPL (>= 2)
 Depends: R(>= 3.4), stats, graphics, e1071, Biostrings, rstan, ranger, 
     parallel, foreach, doParallel

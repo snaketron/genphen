@@ -1,91 +1,118 @@
 
 
 
+
+
 # Description:
-# Get genotype-phenotype data in format for stan
-getGenphenData <- function(genotype, phenotype,
-                           phenotype.type,
-                           min.observations) {
-
-  if(phenotype.type == "continuous") {
-    out <- vector(mode = "list")
-    out.counter <- 1
-    E_mu <- 0
-    E_sigma <- 0
-
+# Get genotype-phenotype data in a multicore fashion
+getGenphenData <- function(genotype, phenotype, cores) {
+  
+  
+  # set site id
+  colnames(genotype) <- 1:ncol(genotype)
+  
+  
+  # Description:
+  # Get genotype-phenotype data
+  getData <- function(genotype, phenotype) {
+    # MIN.OBS <- 3
+    MIN.OBS <- 1
+    
+    sites <- colnames(genotype)
+    snp.counter <- 1
+    genphen.data <- NULL
+    temp.genphen.data <- NULL
     for(i in 1:ncol(genotype)) {
-      js <- unique(genotype[, i])
-      if(length(js) != 1) {
-        X <- as.numeric(as.factor(genotype[, i]))
-        k <- which(table(X) >= min.observations)
-        if(length(k) != 1) {
-          Y <- phenotype[X %in% as.numeric(names(k))]
-          G <- genotype[X %in% as.numeric(names(k)), i]
-          X <- as.numeric(as.factor(X[X %in% as.numeric(names(k))]))
-          Ng <- numeric(length = length(unique(X))) # nr.of samples per genotype
-          for(j in 1:max(X)) {
-            temp.Y <- Y[X == j]
-            Ng[j] <- length(temp.Y)
-            E_mu <- c(E_mu, mean(temp.Y))
-            E_sigma <- c(E_sigma, stats::sd(temp.Y))
+      gs <- unique(genotype[, i])
+      
+      # if not completely conserved position
+      if(length(gs) != 1) {
+        
+        # loop through pairs of residues
+        for(j in 1:(length(gs) - 1)) {
+          for(k in (j+1):length(gs)) {
+            
+            # 1
+            hit.j <- which(genotype[, i] == gs[j])
+            
+            # 0
+            hit.k <- which(genotype[, i] == gs[k])
+            
+            if(length(hit.j) >= MIN.OBS & length(hit.k) >= MIN.OBS) {
+              # create rows
+              row.j <- data.frame(X = rep(x = 1, length = length(hit.j)),
+                                  J = snp.counter, S = sites[i],
+                                  Y = phenotype[hit.j], G = gs[j],
+                                  stringsAsFactors = FALSE)
+              row.k <- data.frame(X = rep(x = 0, length = length(hit.k)),
+                                  J = snp.counter, S = sites[i],
+                                  Y = phenotype[hit.k], G = gs[k],
+                                  stringsAsFactors = FALSE)
+              
+              
+              temp.genphen.data <- rbind(temp.genphen.data, 
+                                         rbind(row.j, row.k))
+              # genphen data
+              if(snp.counter %% 50 == 1) {
+                genphen.data <- rbind(genphen.data, temp.genphen.data)
+                temp.genphen.data <- NULL
+              }
+              snp.counter <- snp.counter + 1
+            }
           }
-
-          l <- list(site = i, G = G, Y = Y, X = X, Ng = Ng,
-                    Nx = length(Ng), Ny = length(Y))
-          out[[out.counter]] <- l
-          out.counter <- out.counter + 1
         }
       }
     }
-
-    # if empty return NULL
-    if(length(out) == 0) {
-      return(NULL)
+    
+    # remaining genphen data
+    if(is.null(temp.genphen.data) == FALSE) {
+      genphen.data <- rbind(genphen.data, temp.genphen.data)
+      temp.genphen.data <- NULL
     }
-
-    # empirical mean and SD
-    E_mu <- mean(E_mu, na.rm = TRUE)
-    E_sigma <- mean(E_sigma, na.rm = TRUE)
-    for(i in 1:length(out)) {
-      out[[i]]$E_mu <- E_mu
-      out[[i]]$E_sigma <- E_sigma
+    
+    # if no genphen data, return null
+    if(is.null(genphen.data) == TRUE
+       ||length(genphen.data) == 0
+       ||nrow(genphen.data) == 0) {
+      return (NULL)
     }
+    
+    return (genphen.data)
   }
-  else if(phenotype.type == "dichotomous") {
-    out <- vector(mode = "list")
-    out.counter <- 1
-    for(i in 1:ncol(genotype)) {
-      js <- unique(genotype[, i])
-      if(length(js) != 1) {
-        X <- as.numeric(as.factor(genotype[, i]))
-        k <- which(table(X) >= min.observations)
-        if(length(k) != 1) {
-          Y <- phenotype[X %in% as.numeric(names(k))]
-          G <- genotype[X %in% as.numeric(names(k)), i]
-          X <- as.numeric(as.factor(X[X %in% as.numeric(names(k))]))
-
-          Ng <- numeric(length = length(unique(X))) # nr.of samples per genotype
-          for(j in 1:max(X)) {
-            temp.Y <- Y[X == j]
-            Ng[j] <- length(temp.Y)
-          }
-
-          l <- list(site = i, G = G, Y = Y, X = X, Ng = Ng,
-                    Nx = length(Ng), Ny = length(Y))
-          out[[out.counter]] <- l
-          out.counter <- out.counter + 1
-        }
-      }
-    }
+  
+  
+  # simple data (no-multicore)
+  if(cores >= ncol(genotype)/2) {
+    genphen.data <- getData(genotype, phenotype) 
   }
-
-  # if empty return NULL
-  if(length(out) == 0) {
-    return(NULL)
+  else {
+    # split data for mc
+    is <- ceiling(seq(from = 1, to = ncol(genotype), length.out = cores + 1))
+    is[1] <- 0
+    
+    
+    # register cluster and go through all snps to extract stats, ppc, rpa
+    cl <- parallel::makeCluster(cores)
+    doParallel::registerDoParallel(cl)
+    i <- NULL
+    genphen.data <- (foreach(i = 1:(length(is) - 1)) %dopar% 
+                       getData(genotype = genotype[, (is[i]+1):is[i+1]], 
+                               phenotype = phenotype))
+    # stop cluster
+    parallel::stopCluster(cl = cl)
+    doParallel::stopImplicitCluster()
+    
+    
+    # rbind
+    genphen.data <- do.call(rbind, genphen.data)
   }
-
-
-  return (out)
+  
+  # form SNP ids
+  genphen.data$J <- as.numeric(as.factor(paste(genphen.data$S, 
+                                               genphen.data$J, 
+                                               sep = '.')))
+  
+  return (genphen.data)
 }
 
 
@@ -93,102 +120,52 @@ getGenphenData <- function(genotype, phenotype,
 
 
 
-# Description:
-# @Deprecated
-# Get genotype-phenotype data in format for stan
-getCompleteGenphenData <- function(genotype,
-                                   phenotype,
-                                   min.observations) {
 
-  out.data <- c()
+# Description:
+# Get genotype summary
+getGenSummary <- function(genotype) {
+  # MIN.OBS <- 3
+  MIN.OBS <- 1
+  
+  snp.counter <- 1
+  gen.data <- NULL
   for(i in 1:ncol(genotype)) {
-    s.data <- data.frame(S = i, genotype = genotype[, i],
-                         Y = phenotype, stringsAsFactors = FALSE)
-    out.data <- rbind(out.data, s.data)
-  }
-
-  # id variable
-  out.data$X <- paste(out.data$S, out.data$genotype, sep = '')
-
-  # as factor -> as numeric
-  out.data$X <- as.numeric(as.factor(out.data$X))
-  out.data <- out.data[order(out.data$X, decreasing = FALSE), ]
-
-  # I -> counter
-  out.data$I <- 1
-  check <- aggregate(I~X, data = out.data, FUN = sum)
-
-  # keep only ids with count >= min observations
-  out.data <- out.data[out.data$X %in% check$X[check$I >= min.observations], ]
-
-  # II -> remove single sites
-  sites.to.remove <- c()
-  for(site in unique(out.data$S)) {
-    gs <- unique(out.data$genotype[out.data$S == site])
-    if(length(gs) == 1) {
-      sites.to.remove <- c(sites.to.remove, site)
+    gs <- unique(genotype[, i])
+    
+    # if not completely conserved position
+    if(length(gs) != 1) {
+      
+      # loop through pairs of residues
+      for(j in 1:(length(gs) - 1)) {
+        for(k in (j+1):length(gs)) {
+          
+          row <- data.frame(g1 = gs[j], 
+                            g0 = gs[k], 
+                            site = i,
+                            snp.id = snp.counter,
+                            n1 = sum(genotype[, i] == gs[j]),
+                            n0 = sum(genotype[, i] == gs[k]),
+                            stringsAsFactors = FALSE)
+          
+          if(row$n1 >= MIN.OBS & row$n0 >= MIN.OBS) {
+            # gen data
+            gen.data <- rbind(gen.data, row)
+            snp.counter <- snp.counter + 1
+          }
+        }
+      }
     }
   }
-  out.data <- out.data[!out.data$S %in% sites.to.remove, ]
-
-  # refactor in case some were removed in previous step
-  out.data$X <- as.numeric(as.factor(out.data$X))
-  out.data$S <- as.numeric(as.factor(out.data$S))
-
-  # compute empirical mean/sd
-  stats.mean <- aggregate(Y~X, data = out.data, FUN = mean)
-  colnames(stats.mean) <- c("X", "mean.Y")
-  stats.sd <- aggregate(Y~X, data = out.data, FUN = sd)
-  colnames(stats.sd) <- c("X", "sd.Y")
-  stats <- merge(x = stats.mean, y = stats.sd, by = "X")
-
-  # final data for stan
-  data.list <- list(S = out.data$S,
-                    genotype = out.data$genotype,
-                    Y = out.data$Y,
-                    X = out.data$X,
-                    Ny = length(out.data$Y),
-                    Nx = length(unique(out.data$X)),
-                    Ns = length(unique(out.data$S)),
-                    E_mu = mean(stats$mean.Y),
-                    E_sigma = mean(stats$sd.Y))
-
-  return (data.list)
-}
-
-
-
-
-
-
-# Description:
-# Computes HDI given a vector, taken "Doing Bayesian Analysis"
-getHdi <- function(vec, hdi.level) {
-  sortedPts <- sort(vec)
-  ciIdxInc <- floor(hdi.level * length(sortedPts))
-  nCIs = length(sortedPts) - ciIdxInc
-  ciWidth = rep(0 , nCIs)
-  for (i in 1:nCIs) {
-    ciWidth[i] = sortedPts[i + ciIdxInc] - sortedPts[i]
+  
+  # if no genphen data, return null
+  if(is.null(gen.data) || length(gen.data) == 0 || nrow(gen.data) == 0) {
+    return (NULL)
   }
-  HDImin = sortedPts[which.min(ciWidth)]
-  HDImax = sortedPts[which.min(ciWidth) + ciIdxInc]
-  HDIlim = c(HDImin, HDImax)
-  return(HDIlim)
+  
+  return (gen.data)
 }
 
 
-
-
-
-# Description:
-# If an object of type DNAMultipleAlignment
-convertMsaToGenotype <- function(genotype) {
-  if(is.null(attr(genotype, "class")) == FALSE) {
-    genotype <- as.matrix(genotype)
-  }
-  return (genotype)
-}
 
 
 
@@ -197,10 +174,11 @@ convertMsaToGenotype <- function(genotype) {
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
-                       mcmc.iterations, mcmc.warmup, mcmc.cores, hdi.level,
-                       stat.learn.method, cv.iterations) {
-
+checkInput <- function(genotype, phenotype, phenotype.type, model.type,
+                       mcmc.chains, mcmc.iterations, mcmc.warmup, cores, 
+                       hdi.level, stat.learn.method, cv.iterations, 
+                       rpa.iterations, with.stan.obj) {
+  
   checkGenotypePhenotype <- function(genotype, phenotype) {
     # CHECK: genotype
     if(is.null(attr(genotype, "class")) == FALSE) {
@@ -215,208 +193,253 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
           stop("the genotypes cannot have less than two observations the or
                number of genotypes cannot be 0.")
         }
+        }
       }
-    }
     else {
       if(is.vector(genotype)) {
         genotype <- matrix(data = genotype, ncol = 1)
       }
-
+      
       if(nrow(genotype) < 2 | ncol(genotype) == 0) {
         stop("the genotypes cannot have less than two observations or the
              number of genotypes cannot be 0.")
       }
-
+      
       if(!is.matrix(genotype) & !is.data.frame(genotype)) {
         stop("genotype can be one of the following structures: matrix or
              data.frame or DNAMultipleAlignment/AAMultipleAlignment")
       }
-
+      
       if(typeof(genotype) != "character") {
         stop("if it is structured in matrix/data.frame the genotype must
-           be of character type.")
+             be of character type.")
       }
-    }
-
+      }
+    
     # CHECK: phenotype
     if(!is.vector(phenotype)) {
       stop("the phenotype must be a vector.")
     }
-
+    
     if(length(phenotype) < 2) {
       stop("phenotype cannot contain fewer than 2 elements.")
     }
-
+    
     if(!is.numeric(phenotype)) {
       stop("the phenotype must be of numeric type.")
     }
-
+    
     # CHECK: genotype & phenotype
     if(nrow(genotype) != length(phenotype)) {
       stop("length(genotype)!=length(phenotype), they must be equal in length.")
     }
-  }
-
+      }
+  
   checkPhenotypeValidity <- function(phenotype, phenotype.type) {
     if(phenotype.type == "dichotomous") {
       if(length(unique(phenotype)) != 2) {
         stop("The dichotomous phenotype must be a vector with exactly two
              categories (classes) \n")
       }
-    }
-
+      }
+    
     if(phenotype.type == "continuous") {
       if(length(unique(phenotype)) <= 2) {
         warning("The continuous phenotype has less then 3 unique elements,
                 are you sure this is a continuous vector? \n")
       }
+      }
     }
-  }
-
+  
   checkPhenotypeType <- function(phenotype.type) {
     # CHECK: phenotype.type
     if(length(phenotype.type) != 1) {
       stop("phenotype.type must be a string (default = 'continuous')")
     }
-
+    
     if(!is.character(phenotype.type)) {
       stop("phenotype.type must be a string: 'continuous' or 'dichotomous'")
     }
-
+    
     if(!phenotype.type %in% c("continuous", "dichotomous")) {
       stop("phenotype.type must be a string: 'continuous' or 'dichotomous'")
     }
   }
-
+  
+  checkModelType <- function(model.type) {
+    # CHECK: model.type
+    if(length(model.type) != 1) {
+      stop("model.type must be a string (default = 'continuous')")
+    }
+    
+    if(!is.character(model.type)) {
+      stop("model.type must be a string: 'univariate' or 'hierarchical'")
+    }
+    
+    if(!model.type %in% c("univariate", "hierarchical")) {
+      stop("phenotype.type must be a string: 'univariate' or 'hierarchical'")
+    }
+  }
+  
   checkMcmcIterations <- function(mcmc.iterations) {
     # CHECK: mcmc.iterations
     if(length(mcmc.iterations) != 1) {
       stop("the mcmc.iterations must be a number > 0 (default = 10000).")
     }
-
+    
     if(!is.numeric(mcmc.iterations)) {
       stop("mcmc.iterations must be a numeric argument (default = 10000).")
     }
-
+    
     if(mcmc.iterations <= 0) {
       stop("mcmc.iterations must be larger than 0 (default = 10000).")
     }
   }
-
+  
   checkMcmcWarmup <- function(mcmc.warmup) {
     # CHECK: mcmc.warmup
     if(length(mcmc.warmup) != 1) {
       stop("the mcmc.warmup must be a number > 0 (default = 5000).")
     }
-
+    
     if(!is.numeric(mcmc.warmup)) {
       stop("mcmc.warmup must be a numeric argument (default = 5000).")
     }
-
+    
     if(mcmc.warmup <= 0) {
       stop("mcmc.warmup must be larger than 0 (default = 5000).")
     }
   }
-
+  
   checkMcmcChains <- function(mcmc.chains) {
     # CHECK: mcmc.chains
     if(length(mcmc.chains) != 1) {
       stop("mcmc.chains must be a positive integer > 0 (default = 1).")
     }
-
+    
     if(!is.numeric(mcmc.chains)) {
       stop("mcmc.chains must be a positive integer > 0 (default = 1).")
     }
-
+    
     if(mcmc.chains <= 0) {
       stop("mcmc.chains must be a positive integer > 0 (default = 1).")
     }
   }
-
-  checkMcmcCores <- function(mcmc.cores) {
-    # CHECK: mcmc.cores
-    if(length(mcmc.cores) != 1) {
-      stop("mcmc.cores is numeric parameter.")
+  
+  checkCores <- function(cores) {
+    # CHECK: cores
+    if(length(cores) != 1) {
+      stop("cores is numeric parameter.")
     }
-
-    if(is.numeric(mcmc.cores) == FALSE) {
-      stop("mcmc.cores is numeric parameter.")
+    
+    if(is.numeric(cores) == FALSE) {
+      stop("cores is numeric parameter.")
     }
-
-    if(mcmc.cores <= 0) {
-      stop("mcmc.cores is numeric parameter >=1.")
+    
+    if(cores <= 0) {
+      stop("cores is numeric parameter >=1.")
     }
   }
-
+  
   checkHdi <- function(hdi.level) {
     if(length(hdi.level) != 1) {
       stop("The HDI level must be in range (0, 1).")
     }
-
+    
     if(is.numeric(hdi.level) == FALSE) {
       stop("The HDI level must be in range (0, 1).")
     }
-
+    
     if(hdi.level >= 1 | hdi.level <= 0) {
       stop("The HDI level must be in range (0, 1).")
     }
   }
-
+  
   checkMlMethod <- function(stat.learn.method) {
     # CHECK: phenotype.type
     if(length(stat.learn.method) != 1) {
       stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
-
+    
     if(!is.character(stat.learn.method)) {
       stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
-
+    
     if(!stat.learn.method %in% c("rf", "svm", "none")) {
       stop("stat.learn.method must be a string: 'rf', 'svm' or 'none'")
     }
   }
-
+  
   checkCv <- function(stat.learn.method, cv.iterations) {
     if(stat.learn.method %in% c("rf", "svm")) {
       if(length(cv.iterations) != 1) {
         stop("cv.iterations must be a number (default = 1,000).")
       }
-
+      
       if(is.numeric(cv.iterations) == FALSE) {
         stop("cv.iterations must be a number (default = 1,000).")
       }
-
+      
       if(cv.iterations < 100) {
         stop("cv.iterations >= 100 recomended (default = 1,000).")
       }
     }
   }
-
+  
+  checkRpa <- function(rpa.iterations) {
+    if(is.numeric(rpa.iterations) == FALSE) {
+      stop("rpa.iterations must be an integer")
+    }
+    
+    if(length(rpa.iterations) != 1) {
+      stop("rpa.iterations must be an integer.")
+    }
+    
+    if(rpa.iterations < 0) {
+      stop("rpa.iterations must be a positive integer (default = 10).")
+    }
+  }
+  
+  checkStanObj <- function(with.stan.obj) {
+    if(is.logical(with.stan.obj) == FALSE) {
+      stop("with.stan.obj must be logica.")
+    }
+    
+    if(length(with.stan.obj) != 1) {
+      stop("with.stan.obj must be logical (TRUE/FALSE).")
+    }
+  }
+  
   if(is.null(genotype) | missing(genotype) |
      is.null(phenotype) | missing(phenotype) |
      is.null(phenotype.type) | missing(phenotype.type) |
+     is.null(model.type) | missing(model.type) |
      is.null(mcmc.chains) | missing(mcmc.chains) |
      is.null(mcmc.iterations) | missing(mcmc.iterations) |
      is.null(mcmc.warmup) | missing(mcmc.warmup) |
-     is.null(mcmc.cores) | missing(mcmc.cores) |
+     is.null(cores) | missing(cores) |
      is.null(hdi.level) | missing(hdi.level) |
      is.null(stat.learn.method) | missing(stat.learn.method) |
-     is.null(cv.iterations) | missing(cv.iterations)) {
+     is.null(cv.iterations) | missing(cv.iterations) |
+     is.null(rpa.iterations) | missing(rpa.iterations) |
+     is.null(with.stan.obj) | missing(with.stan.obj)) {
     stop("arguments must be non-NULL/specified")
   }
-
+  
   checkGenotypePhenotype(genotype = genotype, phenotype = phenotype)
   checkPhenotypeType(phenotype.type = phenotype.type)
   checkPhenotypeValidity(phenotype = phenotype, phenotype.type = phenotype.type)
+  checkModelType(model.type = model.type)
   checkMcmcIterations(mcmc.iterations = mcmc.iterations)
   checkMcmcWarmup(mcmc.warmup = mcmc.warmup)
   checkMcmcChains(mcmc.chains = mcmc.chains)
-  checkMcmcCores(mcmc.cores = mcmc.cores)
+  checkCores(cores = cores)
   checkHdi(hdi.level = hdi.level)
   checkMlMethod(stat.learn.method = stat.learn.method)
   checkCv(stat.learn.method = stat.learn.method, cv.iterations = cv.iterations)
-}
+  checkRpa(rpa.iterations = rpa.iterations)
+  checkStanObj(with.stan.obj = with.stan.obj)
+    }
 
 
 
@@ -425,64 +448,44 @@ checkInput <- function(genotype, phenotype, phenotype.type, mcmc.chains,
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInputDiagnostics <- function(genotype, anchor.points,
-                                  with.anchor.points,
-                                  rf.importance.trees){
-
-
-
-  checkAnchors <- function(anchor.points, rf.importance.trees) {
-    if(length(anchor.points) <= 0) {
-      stop("anchor.points must be a numeric vector in range [1:ncol(genotype)]")
+checkInputDiagnostics <- function(genotype, diagnostic.points, rf.trees){
+  
+  checkDiagnosticPoints <- function(diagnostic.points, rf.trees) {
+    
+    if(length(rf.trees) != 1) {
+      stop("diagnostics.samples must be a number (default = 5,000).")
     }
-    if(length(rf.importance.trees) != 1) {
-      stop("diagnostics.samples must be a number (default = 50,000).")
+    
+    if(is.numeric(rf.trees) == FALSE) {
+      stop("rf.trees must be a number (default = 5,000).")
     }
-
-
-    if(is.numeric(anchor.points) == FALSE) {
-      stop("anchor.points must be a numeric vector.")
-    }
-    if(is.numeric(rf.importance.trees) == FALSE) {
-      stop("rf.importance.trees must be a number (default = 50,000).")
-    }
-
-
-    if(any(anchor.points <= 0)) {
-      stop("anchor.points must be a numeric vector in range [1:ncol(genotype)]")
-    }
-    if(rf.importance.trees <= 10000) {
-      stop("rf.importance.trees >= 10,000 accepted (default = 50,000).")
+    
+    if(rf.trees < 1000) {
+      stop("rf.trees >= 1,000 accepted (default = 5,000).")
     }
   }
-
-  checkWithAnchorPoints <- function(with.anchor.points) {
-    if(length(with.anchor.points) != 1) {
-      stop("with.anchor.points must be a logical parameter")
-    }
-
-    if(is.logical(with.anchor.points) == FALSE) {
-      stop("with.anchor.points must be a logical parameter")
-    }
-  }
-
-
-  if(is.null(anchor.points) | missing(anchor.points) |
-     is.null(with.anchor.points) | missing(with.anchor.points) |
-     is.null(rf.importance.trees) | missing(rf.importance.trees)) {
+  
+  if(is.null(diagnostic.points) | missing(diagnostic.points) | 
+     is.null(rf.trees) | missing(rf.trees)) {
     stop("arguments must be non-NULL/specified")
   }
-
-  checkAnchors(anchor.points = anchor.points,
-               rf.importance.trees = rf.importance.trees)
-  checkWithAnchorPoints(with.anchor.points = with.anchor.points)
-
-  if(all(anchor.points %in% 1:ncol(genotype)) == FALSE) {
-    stop("The anchor points must lie in the genotype space:",
-         "[", 1, "-", ncol(genotype), "] \n", sep = '')
+  
+  checkDiagnosticPoints(diagnostic.points = diagnostic.points, 
+                        rf.trees = rf.trees)
+  
+  
+  if(length(diagnostic.points) > 0) {
+    if(is.numeric(diagnostic.points) == FALSE) {
+      stop("diagnostic.points must be a numeric vector.")
+    }
+    else {
+      if(all(diagnostic.points %in% 1:ncol(genotype)) == FALSE) {
+        stop("The diagnostic points must lie in the genotype space:",
+             "[", 1, "-", ncol(genotype), "] \n", sep = '')
+      }
+    }
   }
 }
-
 
 
 
@@ -493,8 +496,8 @@ checkInputDiagnostics <- function(genotype, anchor.points,
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
 checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
-
-
+  
+  
   checkGenotype <- function(genotype) {
     if(is.null(attr(genotype, "class")) == FALSE) {
       if(!attr(genotype, "class") %in% c("AAMultipleAlignment",
@@ -508,56 +511,56 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
           stop("the genotypes cannot have less than two observations the or
                number of genotypes cannot be 0.")
         }
+        }
       }
-    }
     else {
       if(is.vector(genotype)) {
         genotype <- matrix(data = genotype, ncol = 1)
       }
-
+      
       if(nrow(genotype) < 2 | ncol(genotype) == 0) {
         stop("the genotypes cannot have less than two observations or the
              number of genotypes cannot be 0.")
       }
-
+      
       if(!is.matrix(genotype) & !is.data.frame(genotype)) {
         stop("genotype can be one of the following structures: matrix or
              data.frame or DNAMultipleAlignment/AAMultipleAlignment")
       }
-
+      
       if(typeof(genotype) != "character") {
         stop("if it is structured in matrix/data.frame the genotype must
-           be of character type.")
+             be of character type.")
       }
-    }
-  }
-
-
+      }
+      }
+  
+  
   checkKinship <- function(input.kinship.matrix) {
-
+    
     if(is.matrix(input.kinship.matrix) == FALSE) {
       stop("precomputed kinship matrix must be a numeric matrix.")
     }
-
+    
     if(is.numeric(input.kinship.matrix) == FALSE) {
       stop("precomputed kinship matrix must be a numeric matrix.")
     }
-
+    
     if(nrow(input.kinship.matrix) != ncol(input.kinship.matrix)) {
       stop("precomputed kinship matrix must be NxN numeric matrix.")
     }
-
+    
     if(nrow(input.kinship.matrix) <= 0) {
       stop("at least two individuals needed for the analysis.")
     }
   }
-
-
+  
+  
   if((is.null(input.kinship.matrix) | missing(input.kinship.matrix))
      & (is.null(genotype) | missing(genotype))) {
     stop("arguments must be non-NULL/specified")
   }
-
+  
   if(is.null(input.kinship.matrix) | missing(input.kinship.matrix)) {
     if(is.null(genotype) | missing(genotype)) {
       stop("arguments must be non-NULL/specified")
@@ -567,7 +570,7 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
     checkKinship(input.kinship.matrix = input.kinship.matrix)
   }
   checkGenotype(genotype = genotype)
-}
+    }
 
 
 
@@ -579,165 +582,149 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
 # Given two vectors, one dependent (genotype) and one independent
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
-# The classification is computed using random forests.
-getRfCa <- function(data.list, cv.fold, cv.steps,
-                    hdi.level, ntree, mcmc.cores) {
-
-
+# The classification is computed using random forest.
+getRfCa <- function(genphen.data, cv.fold, 
+                    cv.steps, hdi.level, 
+                    ntree) {
+  
+  
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence
   # is met before the number of steps is hit.
   getIncrementalLearning <- function(Y, X, cv.fold, ntree, I, e = 0.01) {
-
-
+    
+    
     # Description:
     # Perform N number of classifications and compute N number of:
     # - classification accuracy
     # - kappa statistics
     # - number of successful classifications (ideally == N)
     booter <- function(X, Y, cv.fold, ntree) {
+      
+      
       # number of total data entries
       rows <- length(Y)
-
+      
+      
       # sample at random
-      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                  replace = TRUE)
+      s <- sample(x = 1:rows, size = ceiling(x=cv.fold*rows), replace = TRUE)
       train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
       test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
-
+      
+      
       # only one type of predictor (no continous variable)
-      if(length(unique(train$X)) <= 1) {
-        return (list(ca = NA, kappa = NA))
-      }
-      else {
+      ca <- NA
+      kappa <- NA
+      if(length(unique(train$X)) > 1) {
+        
+        
         # train classification model (try condition to avoid errors in case
         # only one-level predictor is train data)
         rf.out <- try(ranger::ranger(as.factor(Y) ~ X, data = train,
                                      num.trees = ntree), silent = TRUE)
-        if(attr(rf.out, "class")[1] == "try-error") {
-          return (list(ca = NA, kappa = NA))
-        }
-        else {
-          # test classification model
-          pr <- stats::predict(object = rf.out, data = test)
-
-          # compute classification accuracy (1 - classification error)
-          ca<-sum(as.character(test$Y)==as.character(pr$predictions))/nrow(test)
-
-          # compute kappa statistics
-          kappa <- getKappa(real = as.character(test$Y),
-                            predicted = as.character(pr$predictions),
-                            aas = unique(Y))
-          return (list(ca = ca, kappa = kappa))
-        }
+        
+        # test classification model
+        pr <- stats::predict(object = rf.out, data = test)
+        
+        
+        # compute classification accuracy (1 - classification error)
+        ca<-sum(as.character(test$Y)==as.character(pr$predictions))/nrow(test)
+        
+        
+        # compute kappa statistics
+        kappa <- getKappa(real = as.character(test$Y),
+                          predicted = as.character(pr$predictions),
+                          aas = unique(Y))
       }
+      
+      return (list(ca = ca, kappa = kappa))
     }
-
-
-    # Description:
-    # Given a confusion matrix table(predicted, real), compute the Cohen's
-    # kappa statistics. Cohen makes the following distinction between the
-    # different kappa ranges.
-    getKappa <- function(predicted, real, aas) {
-
-      buildConfusionMatrix <- function(predicted, real) {
-        cm <- matrix(data = 0, nrow = 2, ncol = 2)
-        cm[1, 1] <- length(intersect(which(real %in% aas[1]),
-                                     which(predicted %in% aas[1])))
-        cm[2, 2] <- length(intersect(which(real %in% aas[2]),
-                                     which(predicted %in% aas[2])))
-        cm[2, 1] <- length(intersect(which(real %in% aas[1]),
-                                     which(!predicted %in% aas[1])))
-        cm[1, 2] <- length(intersect(which(real %in% aas[2]),
-                                     which(!predicted %in% aas[2])))
-        return (cm)
-      }
-
-      cm <- buildConfusionMatrix(predicted = predicted, real = real)
-
-      ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
-      ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
-      kappa <- (ca-ca.exp)/(1-ca.exp)
-
-      return (kappa)
-    }
-
-
+    
+    
+    
     # cv.steps == 100
     if(I == 1) {
+      
+      
       # ca bootstrap
-      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
-                                                   cv.fold = cv.fold,
-                                                   ntree = 1000))
-
+      ca.obj <- replicate(n = 100, expr = booter(Y = Y, X = X, 
+                                                 ntree = 1000, 
+                                                 cv.fold = cv.fold))
+      
+      
       # get cas and kappas
-      ca.obj <- unlist(ca.obj)
-      cas <- as.numeric(ca.obj[names(ca.obj) == "ca"])
-      kappas <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
-
-      # get 95% HDI for the classification accuracy
+      cas <- unlist(ca.obj[which(rownames(ca.obj) == "ca"), ])
+      kappas <- unlist(ca.obj[which(rownames(ca.obj) == "kappa"), ])
+      
+      
+      # get X% HDI for the classification accuracy
       ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
       ca.L <- as.numeric(ca.hdi[1])
       ca.H <- as.numeric(ca.hdi[2])
-      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
-                      round(x = ca.H, digits = 2), ")", sep = '')
-
-      # build 95% HDI for the kappas
+      
+      
+      # build X% HDI for the kappas
       kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
       kappa.L <- as.numeric(kappa.hdi[1])
       kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
-
+      
       return(list(ca = mean(cas, na.rm = TRUE),
                   ca.L = ca.L,
                   ca.H = ca.H,
-                  ca.hdi = ca.hdi,
                   kappa = mean(kappas, na.rm = TRUE),
                   kappa.L = kappa.L,
                   kappa.H = kappa.H,
-                  kappa.hdi = kappa.hdi,
                   I = 1))
     }
-
-
+    
+    
     # keeptrack
     old.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
     updated.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
-
+    
     cas <- c()
     kappas <- c()
     for(i in 1:I) {
-      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
-                                                   cv.fold = cv.fold,
-                                                   ntree = 1000))
-
-      # get cas and kappas
-      ca.obj <- unlist(ca.obj)
-      new.ca <- as.numeric(ca.obj[names(ca.obj) == "ca"])
-      new.kappa <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
-
-      # Update parameters
+      
+      
+      # ca bootstrap
+      ca.obj <- replicate(n = 100, expr = booter(Y = Y, X = X, 
+                                                 ntree = 1000,
+                                                 cv.fold = cv.fold))
+      
+      
+      # get new cas and kappas
+      new.ca <- unlist(ca.obj[which(rownames(ca.obj) == "ca"), ])
+      new.kappa <- unlist(ca.obj[which(rownames(ca.obj) == "kappa"), ])
+      
+      
+      # update parameters
       cas <- c(cas, new.ca)
       kappas <- c(kappas, new.kappa)
-
-      # get 95% HDI for the classification accuracy
+      
+      
+      # get X% HDI for the classification accuracy
       ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
       updated.list[["ca.L"]] <- as.numeric(ca.hdi[1])
       updated.list[["ca.H"]] <- as.numeric(ca.hdi[2])
-
-      # build 95% HDI for the kappas
+      
+      
+      # build X% HDI for the kappas
       kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
       updated.list[["kappa.L"]] <- as.numeric(kappa.hdi[1])
       updated.list[["kappa.H"]] <- as.numeric(kappa.hdi[2])
-
+      
+      
       if(i > 1) {
+        
+        
         # Error:
         errors <- c(abs(updated.list[["kappa.L"]]-old.list[["kappa.L"]]) <= e,
                     abs(updated.list[["kappa.H"]]-old.list[["kappa.H"]]) <= e,
                     abs(updated.list[["ca.L"]]-old.list[["ca.L"]]) <= e,
                     abs(updated.list[["ca.H"]]-old.list[["ca.H"]]) <= e)
-
+        
+        
         if(all(errors) == TRUE) {
           k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
           k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
@@ -746,20 +733,18 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
           return(list(ca = mean(cas, na.rm = TRUE),
                       ca.L = updated.list[["ca.L"]],
                       ca.H = updated.list[["ca.H"]],
-                      ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
                       kappa = mean(kappas, na.rm = TRUE),
                       kappa.L = updated.list[["kappa.L"]],
                       kappa.H = updated.list[["kappa.H"]],
-                      kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
                       I = i))
         }
       }
-
+      
       # keep post
       old.list <- updated.list
     }
-
-
+    
+    
     # if no speedup is possible, return the result after cv.steps
     k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
     k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
@@ -768,66 +753,66 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
     return(list(ca = mean(cas, na.rm = TRUE),
                 ca.L = updated.list[["ca.L"]],
                 ca.H = updated.list[["ca.H"]],
-                ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
                 kappa = mean(kappas, na.rm = TRUE),
                 kappa.L = updated.list[["kappa.L"]],
                 kappa.H = updated.list[["kappa.H"]],
-                kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
                 I = I))
   }
-
-
-  ca.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-
-
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-
-
-      # subset predictor/response
-      X <- data.list$Y[data.list$X %in% c(i, j)]
-      Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
-
-
-      # run incremental CA learnings (100 steps in each iteration)
-      cl <- parallel::makeCluster(mcmc.cores)
-      doParallel::registerDoParallel(cl)
-      class.obj <- getIncrementalLearning(Y = Y,
-                                          X = X,
-                                          cv.fold = cv.fold,
-                                          ntree = ntree,
-                                          I = ceiling(x = cv.steps/100),
-                                          e = 0.01)
-      parallel::stopCluster(cl = cl)
-      doParallel::stopImplicitCluster()
-
-      # pack outputs
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          ca = class.obj$ca,
-                          ca.L = class.obj$ca.L,
-                          ca.H = class.obj$ca.H,
-                          ca.hdi = class.obj$ca.hdi,
-                          kappa = class.obj$kappa,
-                          kappa.L = class.obj$kappa.L,
-                          kappa.H = class.obj$kappa.H,
-                          kappa.hdi = class.obj$kappa.hdi,
-                          I = class.obj$I)
-      ca.out <- rbind(ca.out, stats)
-    }
+  
+  
+  # general data
+  general.data <- list(site = genphen.data$S[1],
+                       snp.id = genphen.data$J[1],
+                       g1 = unique(genphen.data$G[genphen.data$X == 1]),
+                       g0 = unique(genphen.data$G[genphen.data$X == 0]),
+                       n1 = sum(genphen.data$X == 1),
+                       n0 = sum(genphen.data$X == 0),
+                       y1 = sum(genphen.data$Y[genphen.data$X == 1]),
+                       y0 = sum(genphen.data$Y[genphen.data$X == 0]))
+  
+  
+  # subset predictor/response
+  X <- genphen.data$Y
+  Y <- genphen.data$X
+  
+  
+  if(length(unique(X)) < 2) {
+    # pack dummy output, as at least a two-category predictor is needed
+    # to run the incremental learning procedure
+    class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, 
+                      kappa = NA, kappa.L = NA, kappa.H = NA, I = NA)
   }
-
+  else {
+    # run incremental CA learnings (100 steps in each iteration)
+    class.obj <- getIncrementalLearning(Y = Y,
+                                        X = X,
+                                        cv.fold = cv.fold,
+                                        ntree = ntree,
+                                        I = ceiling(x = cv.steps/100),
+                                        e = 0.01)
+  }
+  
+  
+  # collect the stats
+  ca.out <- data.frame(site = general.data$site,
+                       g1 = general.data$g1,
+                       g0 = general.data$g0,
+                       n1 = general.data$n1,
+                       n0 = general.data$n0,
+                       y1 = general.data$y1,
+                       y0 = general.data$y0,
+                       ca = class.obj$ca,
+                       ca.L = class.obj$ca.L,
+                       ca.H = class.obj$ca.H,
+                       kappa = class.obj$kappa,
+                       kappa.L = class.obj$kappa.L,
+                       kappa.H = class.obj$kappa.H,
+                       I = class.obj$I)
+  
+  
   return(ca.out)
 }
+
 
 
 
@@ -838,160 +823,134 @@ getRfCa <- function(data.list, cv.fold, cv.steps,
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
 # The classification is computed using support vector machines.
-getSvmCa <- function(data.list, cv.fold, cv.steps,
-                     hdi.level, mcmc.cores) {
-
+getSvmCa <- function(genphen.data, cv.fold, 
+                     cv.steps, hdi.level) {
+  
+  
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence is met
   # before the number of steps is hit.
   getIncrementalLearning <- function(Y, X, cv.fold, I, e = 0.01) {
-
+    
     # Description:
     # Perform N number of classifications and compute N number of:
     # - classification accuracy
     # - kappa statistics
     # - number of successful classifications (ideally == N)
     booter <- function(X, Y, cv.fold) {
+      
+      
       # number of total data entries
       rows <- length(Y)
-
+      
+      
       # sample at random
-      s <- sample(x = 1:rows, size = round(x = cv.fold * rows, digits = 0),
-                  replace = TRUE)
+      s <- sample(x = 1:rows, size = ceiling(x=cv.fold*rows), replace = TRUE)
       train <- data.frame(Y = Y[s], X = X[s], stringsAsFactors = FALSE)
       test <- data.frame(Y = Y[-s], X = X[-s], stringsAsFactors = FALSE)
-
+      
+      
       # only one type of predictor (no continous variable)
-      if(length(unique(train$X)) <= 1) {
-        return (list(ca = NA, kappa = NA))
-      }
-      else {
+      ca <- NA
+      kappa <- NA
+      if(length(unique(train$X)) > 1) {
+        
+        
         # train classification model (try condition to avoid errors in case
         # only one-level predictor is train data)
         svm.out <- try(e1071::svm(as.factor(Y) ~ X, data = train,
-                                  type = "C-classification"),
-                       silent = TRUE)
-        if(attr(svm.out, "class")[1] == "try-error") {
-          return (list(ca = NA, kappa = NA))
-        }
-        else {
-          # test classification model
-          prediction <- stats::predict(object = svm.out, newdata = test)
-
-          # compute classification accuracy (1 - classification error)
-          ca <- sum(as.character(test$Y)==as.character(prediction))/nrow(test)
-
-          # compute kappa statistics
-          kappa <- getKappa(real = as.character(test$Y),
-                            predicted = as.character(prediction),
-                            aas = unique(Y))
-          return (list(ca = ca, kappa = kappa))
-        }
+                                  type = "C-classification"), silent = TRUE)
+        
+        # test classification model
+        pr <- stats::predict(object = svm.out, data = test)
+        
+        
+        # compute classification accuracy (1 - classification error)
+        ca <- sum(as.character(test$Y)==as.character(pr))/nrow(test)
+        
+        
+        # compute kappa statistics
+        kappa <- getKappa(real = as.character(test$Y),
+                          predicted = as.character(pr),
+                          aas = unique(Y))
       }
+      
+      return (list(ca = ca, kappa = kappa))
     }
-
-    # Description:
-    # Given a confusion matrix table(predicted, real), compute the Cohen's
-    # kappa statistics. Cohen makes the following distinction between the
-    # different kappa ranges.
-    getKappa <- function(predicted, real, aas) {
-
-      buildConfusionMatrix <- function(predicted, real) {
-        cm <- matrix(data = 0, nrow = 2, ncol = 2)
-        cm[1, 1] <- length(intersect(which(real %in% aas[1]),
-                                     which(predicted %in% aas[1])))
-        cm[2, 2] <- length(intersect(which(real %in% aas[2]),
-                                     which(predicted %in% aas[2])))
-        cm[2, 1] <- length(intersect(which(real %in% aas[1]),
-                                     which(!predicted %in% aas[1])))
-        cm[1, 2] <- length(intersect(which(real %in% aas[2]),
-                                     which(!predicted %in% aas[2])))
-        return (cm)
-      }
-
-      cm <- buildConfusionMatrix(predicted = predicted, real = real)
-
-      ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
-      ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
-      kappa <- (ca-ca.exp)/(1-ca.exp)
-
-      return (kappa)
-    }
-
-
+    
+    
+    
     # cv.steps == 100
     if(I == 1) {
+      
       # ca bootstrap
-      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
-                                                   cv.fold = cv.fold))
-
+      ca.obj<-replicate(n = 100, expr = booter(Y = Y, X = X, cv.fold = cv.fold))
+      
       # get cas and kappas
-      ca.obj <- unlist(ca.obj)
-      cas <- as.numeric(ca.obj[names(ca.obj) == "ca"])
-      kappas <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
-
-      # get 95% HDI for the classification accuracy
+      cas <- unlist(ca.obj[which(rownames(ca.obj) == "ca"), ])
+      kappas <- unlist(ca.obj[which(rownames(ca.obj) == "kappa"), ])
+      
+      # get X% HDI for the classification accuracy
       ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
       ca.L <- as.numeric(ca.hdi[1])
       ca.H <- as.numeric(ca.hdi[2])
-      ca.hdi <- paste("(", round(x = ca.L, digits = 2), ", ",
-                      round(x = ca.H, digits = 2), ")", sep = '')
-
-      # build 95% HDI for the kappas
+      
+      # build X% HDI for the kappas
       kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
       kappa.L <- as.numeric(kappa.hdi[1])
       kappa.H <- as.numeric(kappa.hdi[2])
-      kappa.hdi <- paste("(", round(x = kappa.L, digits = 2), ", ",
-                         round(x = kappa.H, digits = 2), ")", sep = '')
-
+      
       return(list(ca = mean(cas, na.rm = TRUE),
                   ca.L = ca.L,
                   ca.H = ca.H,
-                  ca.hdi = ca.hdi,
                   kappa = mean(kappas, na.rm = TRUE),
                   kappa.L = kappa.L,
                   kappa.H = kappa.H,
-                  kappa.hdi = kappa.hdi,
                   I = 1))
     }
-
-
+    
+    
     # keeptrack
     old.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
     updated.list <- list(kappa.L = NA, kappa.H = NA, ca.L = NA, ca.H = NA)
-
+    
     cas <- c()
     kappas <- c()
     for(i in 1:I) {
-      ca.obj <- (foreach(f = 1:100) %dopar% booter(Y = Y, X = X,
-                                                   cv.fold = cv.fold))
-
-      # get cas and kappas
-      ca.obj <- unlist(ca.obj)
-      new.ca <- as.numeric(ca.obj[names(ca.obj) == "ca"])
-      new.kappa <- as.numeric(ca.obj[names(ca.obj) == "kappa"])
-
+      ca.obj<-replicate(n = 100, expr = booter(Y = Y, X = X, cv.fold = cv.fold))
+      
+      
+      # get new cas and kappas
+      new.ca <- unlist(ca.obj[which(rownames(ca.obj) == "ca"), ])
+      new.kappa <- unlist(ca.obj[which(rownames(ca.obj) == "kappa"), ])
+      
+      
       # Update parameters
       cas <- c(cas, new.ca)
       kappas <- c(kappas, new.kappa)
-
-      # get 95% HDI for the classification accuracy
+      
+      
+      # get X% HDI for the classification accuracy
       ca.hdi <- getHdi(vec = cas, hdi.level = hdi.level)
       updated.list[["ca.L"]] <- as.numeric(ca.hdi[1])
       updated.list[["ca.H"]] <- as.numeric(ca.hdi[2])
-
-      # build 95% HDI for the kappas
+      
+      
+      # build X% HDI for the kappas
       kappa.hdi <- getHdi(vec = kappas, hdi.level = hdi.level)
       updated.list[["kappa.L"]] <- as.numeric(kappa.hdi[1])
       updated.list[["kappa.H"]] <- as.numeric(kappa.hdi[2])
-
+      
       if(i > 1) {
+        
+        
         # Error:
         errors <- c(abs(updated.list[["kappa.L"]]-old.list[["kappa.L"]]) <= e,
                     abs(updated.list[["kappa.H"]]-old.list[["kappa.H"]]) <= e,
                     abs(updated.list[["ca.L"]]-old.list[["ca.L"]]) <= e,
                     abs(updated.list[["ca.H"]]-old.list[["ca.H"]]) <= e)
-
+        
+        
         if(all(errors) == TRUE) {
           k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
           k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
@@ -1000,20 +959,18 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
           return(list(ca = mean(cas, na.rm = TRUE),
                       ca.L = updated.list[["ca.L"]],
                       ca.H = updated.list[["ca.H"]],
-                      ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
                       kappa = mean(kappas, na.rm = TRUE),
                       kappa.L = updated.list[["kappa.L"]],
                       kappa.H = updated.list[["kappa.H"]],
-                      kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
                       I = i))
         }
       }
-
+      
       # keep post
       old.list <- updated.list
     }
-
-
+    
+    
     # if no speedup is possible, return the result after cv.steps
     k.l <- round(x = updated.list[["kappa.L"]], digits = 2)
     k.h <- round(x = updated.list[["kappa.H"]], digits = 2)
@@ -1022,68 +979,67 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
     return(list(ca = mean(cas, na.rm = TRUE),
                 ca.L = updated.list[["ca.L"]],
                 ca.H = updated.list[["ca.H"]],
-                ca.hdi = paste("(", c.l, ", ", c.h, ")", sep = ''),
                 kappa = mean(kappas, na.rm = TRUE),
                 kappa.L = updated.list[["kappa.L"]],
                 kappa.H = updated.list[["kappa.H"]],
-                kappa.hdi = paste("(", k.l, ", ", k.h, ")", sep = ''),
                 I = I))
   }
-
-
-  ca.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-
-
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-
-
-      # subset predictor/response
-      X <- data.list$Y[data.list$X %in% c(i, j)]
-      Y <- as.factor(data.list$X[data.list$X %in% c(i, j)])
-
-
-
-
-      # run incremental CA learnings (100 steps in each iteration)
-      cl <- parallel::makeCluster(mcmc.cores)
-      doParallel::registerDoParallel(cl)
-      class.obj <- getIncrementalLearning(Y = Y,
-                                          X = X,
-                                          cv.fold = cv.fold,
-                                          I = ceiling(x = cv.steps/100),
-                                          e = 0.01)
-      parallel::stopCluster(cl = cl)
-      doParallel::stopImplicitCluster()
-
-
-      # pack outputs
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          ca = class.obj$ca,
-                          ca.L = class.obj$ca.L,
-                          ca.H = class.obj$ca.H,
-                          ca.hdi = class.obj$ca.hdi,
-                          kappa = class.obj$kappa,
-                          kappa.L = class.obj$kappa.L,
-                          kappa.H = class.obj$kappa.H,
-                          kappa.hdi = class.obj$kappa.hdi,
-                          I = class.obj$I)
-      ca.out <- rbind(ca.out, stats)
-    }
+  
+  
+  # general data
+  general.data <- list(site = genphen.data$S[1],
+                       snp.id = genphen.data$J[1],
+                       g1 = unique(genphen.data$G[genphen.data$X == 1]),
+                       g0 = unique(genphen.data$G[genphen.data$X == 0]),
+                       n1 = sum(genphen.data$X == 1),
+                       n0 = sum(genphen.data$X == 0),
+                       y1 = sum(genphen.data$Y[genphen.data$X == 1]),
+                       y0 = sum(genphen.data$Y[genphen.data$X == 0]))
+  
+  
+  # subset predictor/response
+  X <- genphen.data$Y
+  Y <- genphen.data$X
+  
+  
+  if(length(unique(X)) < 2) {
+    # pack dummy output, as at least a two-category predictor is needed
+    # to run the incremental learning procedure
+    class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, kappa = NA, 
+                      kappa.L = NA, kappa.H = NA, I = NA)
   }
-
+  else {
+    # run incremental CA learnings (100 steps in each iteration)
+    class.obj <- getIncrementalLearning(Y = Y,
+                                        X = X,
+                                        cv.fold = cv.fold,
+                                        I = ceiling(x = cv.steps/100),
+                                        e = 0.01)
+  }
+  
+  
+  
+  
+  # collect the stats
+  ca.out <- data.frame(site = general.data$site,
+                       g1 = general.data$g1,
+                       g0 = general.data$g0,
+                       n1 = general.data$n1,
+                       n0 = general.data$n0,
+                       y1 = general.data$y1,
+                       y0 = general.data$y0,
+                       ca = class.obj$ca,
+                       ca.L = class.obj$ca.L,
+                       ca.H = class.obj$ca.H,
+                       kappa = class.obj$kappa,
+                       kappa.L = class.obj$kappa.L,
+                       kappa.H = class.obj$kappa.H,
+                       I = class.obj$I)
+  
+  
   return(ca.out)
 }
+
 
 
 
@@ -1091,38 +1047,36 @@ getSvmCa <- function(data.list, cv.fold, cv.steps,
 
 # Description:
 # Dummy CA output
-getNoneCa <- function(data.list) {
-
-
-  ca.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-
-
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-
-
-      # pack outputs
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          ca = NA,
-                          ca.L = NA,
-                          ca.H = NA,
-                          ca.hdi = NA,
-                          ca.boots = NA)
-      ca.out <- rbind(ca.out, stats)
-    }
-  }
-
-  return(ca.out)
+getNoneCa <- function(genphen.data) {
+  
+  # general data
+  general.data <- list(site = genphen.data$S[1],
+                       snp.id = genphen.data$J[1],
+                       g1 = unique(genphen.data$G[genphen.data$X == 1]),
+                       g0 = unique(genphen.data$G[genphen.data$X == 0]),
+                       n1 = sum(genphen.data$X == 1),
+                       n0 = sum(genphen.data$X == 0),
+                       y1 = sum(genphen.data$Y[genphen.data$X == 1]),
+                       y0 = sum(genphen.data$Y[genphen.data$X == 0]))
+  
+  
+  # collect the stats
+  ca.out <- data.frame(site = general.data$site,
+                       g1 = general.data$g1,
+                       g0 = general.data$g0,
+                       n1 = general.data$n1,
+                       n0 = general.data$n0,
+                       y1 = general.data$y1,
+                       y0 = general.data$y0,
+                       ca = NA, 
+                       ca.L = NA, 
+                       ca.H = NA,
+                       kappa = NA, 
+                       kappa.L = NA, 
+                       kappa.H = NA,
+                       I = NA)
+  
+  return (ca.out)
 }
 
 
@@ -1131,406 +1085,814 @@ getNoneCa <- function(data.list) {
 
 
 # Description:
-# Bhattacharyya Coefficient of two distribution
-# Taken from: source("http://tguillerme.github.io/R/bhatt.coef.R")
-getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
-  #SANITIZING
-  #x
-  if(class(x) != 'numeric') {
-    stop("'x' must be numeric.")
-  }
-  if(length(x) < 2) {
-    stop("'x' need at least two data points.")
-  }
-
-  #y
-  if(class(y) != 'numeric') {
-    stop("'y' must be numeric.")
-  }
-  if(length(y) < 2) {
-    stop("'y' need at least two data points.")
-  }
-
-  #bw
-  if(length(bw) != 1) {
-    stop("'bw' must be either a single numeric value or a single function.")
-  }
-  if(class(bw) != 'function') {
-    if(class(bw) != 'numeric') {
-      stop("'bw' must be either a single numeric value or a single function.")
-    }
-  }
-  #Avoiding non-entire numbers
-  if(class(bw) == 'numeric') {
-    bw<-round(bw)
-  }
-
-  #BHATTACHARYYA COEFFICIENT
-  #sum(sqrt(x relative counts in bin_i * y relative counts in bin_i))
-
-  #Setting the right number of bins (i)
-  if(class(bw) == 'function') {
-    #Bin width
-    band.width<-bw(c(x,y), ...)
-    #Bin breaks
-    #adding an extra bandwith to the max to be sure to include all the data
-    bin.breaks<-seq(from=min(c(x,y)), to=max(c(x,y)+band.width), by=band.width)
-    #Number of bins
-    bin.n<-length(bin.breaks)-1
-  } else {
-    #Bin breaks
-    bin.breaks<-hist(c(x,y), breaks=bw, plot=FALSE)$breaks
-    #Bin width
-    band.width<-diff(bin.breaks)[1]
-    #Number of bins
-    bin.n<-bw
-  }
-
-  #Counting the number of elements per bin
-  histx<-hist(x, breaks=bin.breaks, plot=FALSE)[[2]]
-  histy<-hist(y, breaks=bin.breaks, plot=FALSE)[[2]]
-  #Relative counts
-  rel.histx<-histx/sum(histx)
-  rel.histy<-histy/sum(histy)
-
-  #Calculating the Bhattacharyya Coefficient (sum of the square root of
-  # the multiple of the relative counts of both distributions)
-  bc <- sum(sqrt(rel.histx*rel.histy))
-  b.coef.x <- sum(sqrt((histx[histx != 0]/sum(histx[histx != 0]))*
-                         (histy[histx != 0]/sum(histy[histx != 0]))))
-  b.coef.y <- sum(sqrt((histx[histy != 0]/sum(histx[histy != 0]))*
-                         (histy[histy != 0]/sum(histy[histy != 0]))))
-  b.coef.max <- max(b.coef.x, b.coef.y)
-  return(list(bc = bc, b.coef.max = b.coef.max))
-}
-
-
-
-
-
-
-# Description:
-# Computes a Bayesian t-test
-runContinuous <- function(data.list, mcmc.chains, mcmc.iterations,
-                          mcmc.warmup, mcmc.cores, hdi.level, model.stan,
-                          with.rpa = FALSE, rpa.iterations = 0,
-                          rpa.rope = 0) {
-
+# Bayesian univariate GLM with continuous outcome and a two-factor predictor.
+runContU <- function(genphen.data, mcmc.chains, mcmc.iterations, 
+                     mcmc.warmup, cores, hdi.level, model.stan, 
+                     rpa.iterations = 0, with.stan.obj = FALSE) {
+  
+  
+  data.list <- list(X = genphen.data$X,
+                    Y = genphen.data$Y,
+                    Z = nrow(genphen.data),
+                    site = genphen.data$S[1],
+                    snp.id = genphen.data$J[1],
+                    G = genphen.data$G)
+  
+  
   # get initial parameter values
-  posterior <- sampling(object = model.stan,
-                        data = data.list,
-                        pars = c("mu", "sigma", "nu"),
-                        iter = mcmc.iterations,
-                        warmup = mcmc.warmup,
-                        chains = mcmc.chains,
-                        cores = mcmc.cores,
-                        control = list(adapt_delta = 0.95,
-                                       max_treedepth = 10),
-                        verbose = FALSE,
-                        refresh = -1)
-
-
-  # check for divergence
-  divergence.params <- get_sampler_params(posterior, inc_warmup = FALSE)
-  divergence <- FALSE
-  treedepth <- FALSE
-  for(chain in 1:mcmc.chains) {
-    if(any(divergence.params[[chain]][, "divergent__"] != 0)) {
-      divergence <- TRUE
-    }
-
-    if(any(divergence.params[[chain]][, "treedepth__"] > 10)) {
-      treedepth <- TRUE
-    }
+  posterior <- rstan::sampling(object = model.stan,
+                               data = data.list,
+                               pars = c("alpha", "beta", "sigma", "nu"),
+                               iter = mcmc.iterations,
+                               warmup = mcmc.warmup,
+                               chains = mcmc.chains,
+                               cores = cores,
+                               control = list(adapt_delta = 0.95,
+                                              max_treedepth = 10),
+                               verbose = FALSE,
+                               refresh = -1)
+  
+  
+  # if with.model == TRUE, keep the stan object
+  stan.obj <- NULL
+  if(with.stan.obj == TRUE) {
+    stan.obj <- posterior
   }
-
-
+  
+  
+  # general data
+  general.data <- list(site = data.list$site,
+                       snp.id = data.list$snp.id,
+                       g1 = unique(data.list$G[data.list$X == 1]),
+                       g0 = unique(data.list$G[data.list$X == 0]),
+                       n1 = sum(data.list$X == 1),
+                       n0 = sum(data.list$X == 0))
+  
+  
+  # compute posterior summary
+  hdi.L <- (1-hdi.level)/2
+  hdi.H <- 1-(1-hdi.level)/2
+  stats <- rstan::summary(object = posterior, 
+                          pars = c("alpha", "beta", "sigma", "nu"), 
+                          prob = c(hdi.L, hdi.H))$summary
+  
+  
   # convergence data
-  convergence <- summary(posterior)$summary[, c("Rhat", "n_eff")]
-  convergence.out <- c()
-  for(i in 1:max(data.list$X)) {
-    mu.rhat <- convergence[paste("mu[", i, "]", sep = ''), "Rhat"]
-    mu.ess <- convergence[paste("mu[", i, "]", sep = ''), "n_eff"]
-    sigma.rhat <- convergence[paste("sigma[", i, "]", sep = ''), "Rhat"]
-    sigma.ess <- convergence[paste("sigma[", i, "]", sep = ''), "n_eff"]
-    convergence.row <- data.frame(s = data.list$site,
-                                  g = data.list$G[data.list$X == i][1],
-                                  n = sum(data.list$X == i),
-                                  mu.rhat = mu.rhat, sigma.rhat = sigma.rhat,
-                                  mu.ess = mu.ess, sigma.ess = sigma.ess,
-                                  divergence = divergence,
-                                  treedepth = treedepth,
-                                  stringsAsFactors = FALSE)
-    convergence.out <- rbind(convergence.out, convergence.row)
-  }
-
-
+  convergence.out <- data.frame(stats[, c("Rhat", "n_eff")],
+                                stringsAsFactors = FALSE)
+  convergence.out$par <- rownames(convergence.out)
+  convergence.out$site <- general.data$site
+  convergence.out$g1 <- general.data$g1
+  convergence.out$g0 <- general.data$g0
+  convergence.out$n1 <- general.data$n1
+  convergence.out$n0 <- general.data$n0
+  rownames(convergence.out) <- NULL
+  
+  
   # posterior data
-  posterior <- data.frame(extract(posterior))
-  statistics.out <- c()
-  ppc.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-
-
-      # extract posterior
-      mu.i <- posterior[, paste("mu.", i, sep = '')]
-      sigma.i <- posterior[, paste("sigma.", i, sep = '')]
-      mu.j <- posterior[, paste("mu.", j, sep = '')]
-      sigma.j <- posterior[, paste("sigma.", j, sep = '')]
-      nu <- posterior[, "nu"]
-
-
-      # Alternative Cohen's d based on Hedges 1981
-      # pool.sd <- sqrt(((sigma.i^2)*(n.i-1)+(sigma.j^2)*(n.j-1))/(n.i+n.j-2))
-      # cohens.d <- (mu.i - mu.j)/pool.sd
-      cohens.d <- (mu.i - mu.j)/sqrt((sigma.i^2 + sigma.j^2)/2)
-      cohens.d.mean <- mean(cohens.d)
-      cohens.d.hdi <- getHdi(vec = cohens.d, hdi.level = hdi.level)
-      cohens.d.L = cohens.d.hdi[1]
-      cohens.d.H = cohens.d.hdi[2]
-      cohens.d.hdi <- paste("(", round(x = cohens.d.L, digits = 2), ", ",
-                            round(x = cohens.d.H, digits = 2), ")", sep = '')
-
-
-      # Difference in sd
-      sd.d <- sigma.i - sigma.j
-      sd.d.mean <- mean(sd.d)
-      sd.d.hdi <- getHdi(vec = sd.d, hdi.level = hdi.level)
-      sd.d.L = sd.d.hdi[1]
-      sd.d.H = sd.d.hdi[2]
-      sd.d.hdi <- paste("(", round(x = sd.d.L, digits = 2), ", ",
-                        round(x = sd.d.H, digits = 2), ")", sep = '')
-
-
-      # Bhat coeff
-      ppc.i <- mean(mu.i)+mean(sigma.i)*stats::rt(n = 10^6, df = mean(nu))
-      ppc.j <- mean(mu.j)+mean(sigma.j)*stats::rt(n = 10^6, df = mean(nu))
-      bhat <- getBhattacharyya(x = ppc.i, y = ppc.j)
-      bc <- bhat$bc
-
-
-      # predicted vs real means
-      ppc.row <- data.frame(site = site,
-                            general = general,
-                            predicted.mu.i = mean(ppc.i),
-                            predicted.mu.j = mean(ppc.j),
-                            real.mu.i = mean(data.list$Y[data.list$X == i]),
-                            real.mu.j = mean(data.list$Y[data.list$X == j]))
-      ppc.out <- rbind(ppc.out, ppc.row)
-
-
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          cohens.d = cohens.d.mean,
-                          cohens.d.L = cohens.d.L,
-                          cohens.d.H = cohens.d.H,
-                          cohens.d.hdi = cohens.d.hdi,
-                          bc = bc,
-                          sd.d = sd.d.mean,
-                          sd.d.L = sd.d.L,
-                          sd.d.H = sd.d.H,
-                          sd.d.hdi = sd.d.hdi)
-      statistics.out <- rbind(statistics.out, stats)
-    }
+  posterior <- data.frame(rstan::extract(posterior))
+  
+  
+  # ppc
+  ppc.fun <- function(p, x, n) {
+    return(p[1]+p[2]*x+p[3]*stats::rt(n = 1, df = p[4]))
   }
-
-  # special case for RPA
-  rpa.out <- NULL
-  if(with.rpa == TRUE) {
-    rpa.out <- getRpaContinuous(data.list = data.list,
-                                hdi.level = hdi.level,
-                                rpa.iterations = rpa.iterations,
-                                rpa.rope = rpa.rope,
-                                posterior = posterior,
-                                model.stan = model.stan,
-                                mcmc.warmup = mcmc.warmup,
-                                mcmc.iterations = mcmc.iterations,
-                                mcmc.chains = mcmc.chains,
-                                mcmc.cores = mcmc.cores)
-  }
-
-  return (list(statistics.out = statistics.out,
-               convergence.out = convergence.out,
-               rpa.out = rpa.out,
-               ppc.out = ppc.out))
-}
-
-
-
-
-# Description:
-# Computes a Bayesian odds-ratio test
-runDichotomous <- function(data.list, mcmc.chains, mcmc.iterations,
-                           mcmc.warmup, mcmc.cores, hdi.level, model.stan,
-                           with.rpa = FALSE, rpa.iterations = 0,
-                           rpa.rope = 0) {
-
-
-  # get initial parameter values
-  posterior <- sampling(object = model.stan,
-                        data = data.list,
-                        pars = c("mu"),
-                        iter = mcmc.iterations,
-                        warmup = mcmc.warmup,
-                        chains = mcmc.chains,
-                        cores = mcmc.cores,
-                        control = list(adapt_delta = 0.99, max_treedepth = 10),
-                        verbose = FALSE,
-                        refresh = -1)
-
-
-  # check for divergence
-  divergence.params <- get_sampler_params(posterior, inc_warmup = FALSE)
-  divergence <- FALSE
-  treedepth <- FALSE
-  for(chain in 1:mcmc.chains) {
-    if(any(divergence.params[[chain]][, "divergent__"] != 0)) {
-      divergence <- TRUE
-    }
-
-    if(any(divergence.params[[chain]][, "treedepth__"] > 10)) {
-      treedepth <- TRUE
-    }
-  }
-
-
-  # convergence data
-  convergence <- summary(posterior)$summary[, c("Rhat", "n_eff")]
-  convergence.out <- c()
-  for(i in 1:max(data.list$X)) {
-    mu.rhat <- convergence[paste("mu[", i, "]", sep = ''), "Rhat"]
-    mu.ess <- convergence[paste("mu[", i, "]", sep = ''), "n_eff"]
-    convergence.row <- data.frame(s = data.list$site,
-                                  g = data.list$G[data.list$X == i][1],
-                                  n = sum(data.list$X == i),
-                                  mu.rhat = mu.rhat, mu.ess = mu.ess,
-                                  divergence = divergence,
-                                  treedepth = treedepth,
-                                  stringsAsFactors = FALSE)
-    convergence.out <- rbind(convergence.out, convergence.row)
-  }
-
-
-  # posterior data
-  posterior <- data.frame(extract(posterior))
-  statistics.out <- c()
-  ppc.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-
-
-      # extract posterior
-      mu.i <- posterior[, paste("mu.", i, sep = '')]
-      mu.j <- posterior[, paste("mu.", j, sep = '')]
-
-
-      # compute Cohen's d and HDI's
-      absolute.d <- mu.i - mu.j
-      absolute.d.mean <- mean(absolute.d)
-      absolute.d.hdi <- getHdi(vec = absolute.d, hdi.level = hdi.level)
-      absolute.d.L <- absolute.d.hdi[1]
-      absolute.d.H <- absolute.d.hdi[2]
-      absolute.d.hdi <- paste("(", round(x = absolute.d.L, digits = 2), ", ",
-                              round(x = absolute.d.H, digits = 2), ")",
-                              sep = '')
-
-
-      # Bhat coeff
-      ppc.i <- stats::rbinom(n = 10^6, prob = mean(mu.i), size = n.i)/n.i
-      ppc.j <- stats::rbinom(n = 10^6, prob = mean(mu.j), size = n.j)/n.j
-      bhat <- getBhattacharyya(x = ppc.i, y = ppc.j)
-      bc <- bhat$bc
-
-
-      # predicted vs real means
-      ppc.row <- data.frame(site = site,
-                            general = general,
-                            predicted.mu.i = mean(ppc.i),
-                            predicted.mu.j = mean(ppc.j),
-                            real.mu.i = mean(data.list$Y[data.list$X == i]),
-                            real.mu.j = mean(data.list$Y[data.list$X == j]))
-      ppc.out <- rbind(ppc.out, ppc.row)
-
-
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          absolute.d = absolute.d.mean,
-                          absolute.d.L = absolute.d.L,
-                          absolute.d.H = absolute.d.H,
-                          absolute.d.hdi = absolute.d.hdi,
+  ppc.1 <- apply(X = posterior[, c("alpha", "beta", "sigma", "nu")], MARGIN = 1, 
+                 FUN = ppc.fun, x = 1, n = general.data$n1)
+  ppc.0 <- apply(X = posterior[, c("alpha", "beta", "sigma", "nu")], MARGIN = 1, 
+                 FUN = ppc.fun, x = 0, n = general.data$n0)
+  bc <- getBhattacharyya(x = ppc.1, y = ppc.0)$bc
+  ppc.1.hdi <- getHdi(vec = ppc.1, hdi.level = hdi.level)
+  ppc.0.hdi <- getHdi(vec = ppc.0, hdi.level = hdi.level)
+  
+  
+  # predicted vs real means
+  ppc.out <- data.frame(site = general.data$site,
+                        g1 = general.data$g1,
+                        g0 = general.data$g0,
+                        n1 = general.data$n1,
+                        n0 = general.data$n0,
+                        pred.mean.1 = mean(ppc.1),
+                        pred.1.L = ppc.1.hdi[1],
+                        pred.1.H = ppc.1.hdi[2],
+                        pred.mean.0 = mean(ppc.0),
+                        pred.0.L = ppc.0.hdi[1],
+                        pred.0.H = ppc.0.hdi[2],
+                        real.mean.1 = mean(data.list$Y[data.list$X == 1]),
+                        real.mean.0 = mean(data.list$Y[data.list$X == 0]))
+  
+  
+  # collect the stats
+  stats.out <- data.frame(site = general.data$site,
+                          g1 = general.data$g1,
+                          g0 = general.data$g0,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          beta.mean = stats["beta", "mean"],
+                          beta.se = stats["beta", "se_mean"],
+                          beta.sd = stats["beta", "sd"],
+                          beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
+                          beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
+                          alpha.mean = stats["alpha", "mean"],
+                          alpha.se = stats["alpha", "se_mean"],
+                          alpha.sd = stats["alpha", "sd"],
+                          alpha.L = stats["alpha", paste(hdi.L*100,"%",sep='')],
+                          alpha.H = stats["alpha", paste(hdi.H*100,"%",sep='')],
+                          sigma.mean = stats["sigma", "mean"],
+                          sigma.se = stats["sigma", "se_mean"],
+                          sigma.sd = stats["sigma", "sd"],
+                          sigma.L = stats["sigma", paste(hdi.L*100,"%",sep='')],
+                          sigma.H = stats["sigma", paste(hdi.H*100,"%",sep='')],
+                          nu.mean = stats["nu", "mean"],
+                          nu.se = stats["nu", "se_mean"],
+                          nu.sd = stats["nu", "sd"],
+                          nu.L = stats["nu", paste(hdi.L*100,"%",sep='')],
+                          nu.H = stats["nu", paste(hdi.H*100,"%",sep='')],
                           bc = bc)
-      statistics.out <- rbind(statistics.out, stats)
-    }
-  }
-
+  
+  
   # special case for RPA
   rpa.out <- NULL
-  if(with.rpa == TRUE) {
-    rpa.out <- getRpaDichotomous(data.list = data.list,
-                                 hdi.level = hdi.level,
-                                 rpa.iterations = rpa.iterations,
-                                 rpa.rope = rpa.rope,
-                                 posterior = posterior,
-                                 model.stan = model.stan,
-                                 mcmc.warmup = mcmc.warmup,
-                                 mcmc.iterations = mcmc.iterations,
-                                 mcmc.chains = mcmc.chains,
-                                 mcmc.cores = mcmc.cores)
+  if(rpa.iterations > 0) {
+    rpa.out <- getRpaCont(posterior = posterior,
+                          beta.mean = stats["beta", "mean"],
+                          site = general.data$site,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          g1 = general.data$g1, 
+                          g0 = general.data$g0,
+                          hdi.level = hdi.level, 
+                          rpa.iterations = rpa.iterations,
+                          model.stan = model.stan,
+                          mcmc.iterations = mcmc.iterations,
+                          mcmc.warmup = mcmc.warmup,
+                          mcmc.chains = mcmc.chains)
   }
-
-  return (list(statistics.out = statistics.out,
+  
+  # return
+  return (list(statistics.out = stats.out,
                convergence.out = convergence.out,
                rpa.out = rpa.out,
-               ppc.out = ppc.out))
+               ppc.out = ppc.out,
+               stan.obj = stan.obj))
+}
+
+
+
+
+
+# Description:
+# Bayesian hierarchical GLM with continuous outcome and a two-factor predictor.
+runContH <- function(genphen.data, mcmc.chains, mcmc.iterations, 
+                     mcmc.warmup, cores, hdi.level, model.stan,
+                     rpa.iterations, with.stan.obj) {
+  
+  
+  # Description:
+  # Collection of results, ppc and rpa in case of hierarchical analysis
+  getResults <- function(j, data.list, general.data, posterior, 
+                         stats, hdi.level, mcmc.chains, mcmc.iterations, 
+                         mcmc.warmup, model.stan, rpa.iterations) {
+    
+    
+    # ppc
+    ppc.fun <- function(p, x, n) {
+      return(p[1]+p[2]*x+p[3]*stats::rt(n = 1, df = p[4]))
+    }
+    
+    # extract their stats including ppc, rpa
+    ppc.1 <- apply(X = posterior, MARGIN = 1, FUN = ppc.fun, 
+                   x = 1, n = general.data$n1)
+    ppc.0 <- apply(X = posterior, MARGIN = 1, FUN = ppc.fun, 
+                   x = 0, n = general.data$n0)
+    bc <- getBhattacharyya(x = ppc.1, y = ppc.0)$bc
+    ppc.1.hdi <- getHdi(vec = ppc.1, hdi.level = hdi.level)
+    ppc.0.hdi <- getHdi(vec = ppc.0, hdi.level = hdi.level)
+    
+    
+    # predicted vs real means
+    ppc.out <- data.frame(site = general.data$site,
+                          g1 = general.data$g1,
+                          g0 = general.data$g0,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          pred.mean.1 = mean(ppc.1),
+                          pred.1.L = ppc.1.hdi[1],
+                          pred.1.H = ppc.1.hdi[2],
+                          pred.mean.0 = mean(ppc.0),
+                          pred.0.L = ppc.0.hdi[1],
+                          pred.0.H = ppc.0.hdi[2],
+                          real.mean.1 = mean(data.list$Y[data.list$X == 1
+                                                         & data.list$S == j]),
+                          real.mean.0 = mean(data.list$Y[data.list$X == 0
+                                                         & data.list$S == j]))
+    
+    
+    # collect the stats
+    a.key <- paste("alpha[", j, "]", sep = '')
+    b.key <- paste("beta[", j, "]", sep = '')
+    s.key <- "sigma"
+    n.key <- "nu"
+    stats.out <- data.frame(site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            beta.mean = stats[b.key, "mean"],
+                            beta.se = stats[b.key, "se_mean"],
+                            beta.sd = stats[b.key, "sd"],
+                            beta.L = stats[b.key, paste(hdi.L*100,"%",sep='')],
+                            beta.H = stats[b.key, paste(hdi.H*100,"%",sep='')],
+                            alpha.mean = stats[a.key, "mean"],
+                            alpha.se = stats[a.key, "se_mean"],
+                            alpha.sd = stats[a.key, "sd"],
+                            alpha.L = stats[a.key, paste(hdi.L*100,"%",sep='')],
+                            alpha.H = stats[a.key, paste(hdi.H*100,"%",sep='')],
+                            sigma.mean = stats[s.key, "mean"],
+                            sigma.se = stats[s.key, "se_mean"],
+                            sigma.sd = stats[s.key, "sd"],
+                            sigma.L = stats[s.key, paste(hdi.L*100,"%",sep='')],
+                            sigma.H = stats[s.key, paste(hdi.H*100,"%",sep='')],
+                            nu.mean = stats[n.key, "mean"],
+                            nu.se = stats[n.key, "se_mean"],
+                            nu.sd = stats[n.key, "sd"],
+                            nu.L = stats[n.key, paste(hdi.L*100,"%",sep='')],
+                            nu.H = stats[n.key, paste(hdi.H*100,"%",sep='')],
+                            bc = bc)
+    
+    
+    # special case for RPA
+    rpa.out <- NULL
+    if(rpa.iterations > 0) {
+      # create a temporary posterior similar to the one in the univariate case
+      a.key <- paste("alpha", j, sep = '.')
+      b.key <- paste("beta", j, sep = '.')
+      s.key <- "sigma"
+      n.key <- "nu"
+      colnames(posterior) <- c("alpha", "beta", "sigma", "nu")
+      
+      rpa.out <- getRpaCont(posterior = posterior,
+                            beta.mean = stats.out$beta.mean,
+                            site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            hdi.level = hdi.level, 
+                            rpa.iterations = rpa.iterations,
+                            model.stan = rpa.model.stan,
+                            mcmc.iterations = mcmc.iterations,
+                            mcmc.warmup = mcmc.warmup,
+                            mcmc.chains = mcmc.chains)
+    }
+    
+    
+    # return
+    return (list(statistics.out = stats.out,
+                 rpa.out = rpa.out,
+                 ppc.out = ppc.out))
+  }
+  
+  
+  data.list <- list(X = genphen.data$X,
+                    Y = genphen.data$Y,
+                    Z = nrow(genphen.data),
+                    S = genphen.data$J, 
+                    S_N = max(genphen.data$J), 
+                    G = genphen.data$G,
+                    site = genphen.data$S)
+  
+  
+  # get initial parameter values
+  posterior <- rstan::sampling(object = model.stan,
+                               data = data.list,
+                               iter = mcmc.iterations,
+                               warmup = mcmc.warmup,
+                               chains = mcmc.chains,
+                               cores = cores,
+                               control = list(adapt_delta = 0.95,
+                                              max_treedepth = 10),
+                               verbose = FALSE,
+                               refresh = -1)
+  
+  
+  # if with.model == TRUE, keep the stan object
+  stan.obj <- NULL
+  if(with.stan.obj == TRUE) {
+    stan.obj <- posterior
+  }
+  
+  
+  # get general data
+  general.data <- c()
+  for(j in 1:max(data.list$S)) {
+    r <- data.frame(site = unique(data.list$site[data.list$S == j]),
+                    S = j,
+                    g1 = data.list$G[data.list$S == j & data.list$X == 1][1],
+                    g0 = data.list$G[data.list$S == j & data.list$X == 0][1],
+                    n1 = sum(data.list$S == j & data.list$X == 1),
+                    n0 = sum(data.list$S == j & data.list$X == 0),
+                    stringsAsFactors = FALSE)
+    general.data <- rbind(general.data, r)
+  }
+  rm(r, j)
+  
+  
+  # compute posterior summary
+  hdi.L <- (1-hdi.level)/2
+  hdi.H <- 1-(1-hdi.level)/2
+  stats <- rstan::summary(object = posterior, 
+                          pars = c("alpha", "beta", "sigma", "nu",
+                                   "mu_alpha", "mu_beta",
+                                   "sd_alpha", "sd_beta",
+                                   "nu_alpha", "nu_beta"), 
+                          prob = c(hdi.L, hdi.H))$summary
+  
+  
+  # convergence data
+  convergence.out <- c()
+  c.row <- data.frame(stats[c("sigma", "nu", 
+                              "mu_alpha", "mu_beta", 
+                              "sd_alpha", "sd_beta", 
+                              "nu_alpha", "nu_beta"), 
+                            c("Rhat", "n_eff")], stringsAsFactors = FALSE)
+  c.row$par <- c("sigma", "nu", 
+                 "mu_alpha", "mu_beta", 
+                 "sd_alpha", "sd_beta",
+                 "nu_alpha", "nu_beta")
+  c.row$site <- ''
+  c.row$g1 <- ''
+  c.row$g0 <- ''
+  c.row$n1 <- ''
+  c.row$n0 <- ''
+  convergence.out <- rbind(convergence.out, c.row)
+  
+  for(j in 1:nrow(general.data)) {
+    c.row <- data.frame(stats[paste(c("alpha", "beta"), "[", j, "]", sep = ''), 
+                              c("Rhat", "n_eff")], stringsAsFactors = FALSE)
+    c.row$par <- c("alpha", "beta")
+    c.row$site <- general.data$site[j]
+    c.row$g1 <- general.data$g1[j]
+    c.row$g0 <- general.data$g0[j]
+    c.row$n1 <- general.data$n1[j]
+    c.row$n0 <- general.data$n0[j]
+    convergence.out <- rbind(convergence.out, c.row)
+  }
+  
+  
+  # posterior data
+  posterior <- data.frame(rstan::extract(posterior))
+  
+  
+  # special case for RPA, compile univariate stan model
+  if(rpa.iterations > 0) {
+    cat("======== Compiling RPA Model ======== \n")
+    rpa.model.stan <- compileModel(phenotype.type = "continuous", 
+                                   model.type = "univariate")
+  }
+  
+  
+  # register cluster and go through all snps to extract stats, ppc, rpa
+  cl <- parallel::makeCluster(cores)
+  doParallel::registerDoParallel(cl)
+  results <- (foreach(j = 1:nrow(general.data),
+                      .export = c("runContU", "getHdi", "getGenphenData",
+                                  "getBhattacharyya", "getRpaCont"), 
+                      .packages = c("rstan")) %dopar% 
+                getResults(j = j, 
+                           data.list = data.list, 
+                           general.data = general.data[j, ], 
+                           posterior = posterior[, c(paste(c("alpha", "beta"), 
+                                                           j, sep = '.'), 
+                                                     "sigma", "nu")], 
+                           stats = stats, 
+                           hdi.level = hdi.level,
+                           mcmc.chains = mcmc.chains, 
+                           mcmc.iterations = mcmc.iterations, 
+                           mcmc.warmup = mcmc.warmup, 
+                           model.stan = model.stan, 
+                           rpa.iterations = rpa.iterations))
+  # stop cluster
+  parallel::stopCluster(cl = cl)
+  doParallel::stopImplicitCluster()
+  
+  
+  # rbind results
+  getO <- function(x, y) {
+    return(x[[y]])
+  }
+  stats.out <- do.call(rbind, lapply(X = results,FUN = getO,y="statistics.out"))
+  if(rpa.iterations == 0) {
+    rpa.out <- NULL
+  }
+  else {
+    rpa.out <- do.call(rbind, lapply(X = results, FUN = getO, y="rpa.out"))
+  }
+  ppc.out <- do.call(rbind, lapply(X = results, FUN = getO, y="ppc.out"))
+  
+  
+  # return
+  return (list(statistics.out = stats.out,
+               convergence.out = convergence.out,
+               rpa.out = rpa.out,
+               ppc.out = ppc.out,
+               stan.obj = stan.obj))
 }
 
 
 
 
 # Description:
-# Given a phenotype.type, the procedure compiles the appropriate STAN model.
-compileModel <- function(phenotype.type) {
-  cat("============================================================= \n")
-  cat("===================== Compiling Model ======================= \n")
-  cat("============================================================= \n")
-  if(phenotype.type == "continuous") {
-    f.local <- "inst/extdata/continuous.stan"
-    f.pkg <- system.file("extdata", "continuous.stan", package = "genphen")
+# Bayesian GLM with dichotomous outcome and a two-factor predictor.
+runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations, 
+                     mcmc.warmup, cores, hdi.level, model.stan, 
+                     rpa.iterations, with.stan.obj) {
+  
+  
+  genphen.data$N <- 1
+  d.N <- stats::aggregate(formula = N~X+S+J+G, data = genphen.data, FUN = sum)
+  d.Y <- stats::aggregate(formula = Y~X+S+J+G, data = genphen.data, FUN = sum)
+  d <- merge(x = d.N, y = d.Y, by = c("X", "S", "J", "G"))
+  data.list <- list(X = d$X, Y = d$Y, N = d$N, Z = nrow(d), site = d$S[1], 
+                    snp.id = d$J[1], G = d$G)
+  rm(genphen.data, d.N, d.Y, d)
+  
+  
+  # get initial parameter values
+  posterior <- rstan::sampling(object = model.stan,
+                               data = data.list,
+                               pars = c("alpha", "beta"),
+                               iter = mcmc.iterations,
+                               warmup = mcmc.warmup,
+                               chains = mcmc.chains,
+                               cores = cores,
+                               control = list(adapt_delta = 0.95, 
+                                              max_treedepth = 10),
+                               verbose = FALSE,
+                               refresh = -1)
+  
+  
+  # if with.model == TRUE, keep the stan object
+  stan.obj <- NULL
+  if(with.stan.obj == TRUE) {
+    stan.obj <- posterior
   }
-  else if(phenotype.type == "dichotomous") {
-    f.local <- "inst/extdata/dichotomous.stan"
-    f.pkg <- system.file("extdata", "dichotomous.stan", package = "genphen")
+  
+  
+  # general data
+  general.data <- list(site = data.list$site,
+                       snp.id = data.list$snp.id,
+                       g1 = data.list$G[data.list$X == 1],
+                       g0 = data.list$G[data.list$X == 0],
+                       n1 = data.list$N[data.list$X == 1],
+                       n0 = data.list$N[data.list$X == 0],
+                       y1 = data.list$Y[data.list$X == 1],
+                       y0 = data.list$Y[data.list$X == 0])
+  
+  
+  # compute posterior summary
+  hdi.L <- (1-hdi.level)/2
+  hdi.H <- 1-(1-hdi.level)/2
+  stats <- rstan::summary(object = posterior,
+                          pars = c("alpha", "beta"),
+                          prob = c(hdi.L, hdi.H))$summary
+  
+  
+  # convergence data
+  convergence.out <- data.frame(stats[, c("Rhat", "n_eff")],
+                                stringsAsFactors = FALSE)
+  convergence.out$par <- rownames(convergence.out)
+  convergence.out$site <- general.data$site
+  convergence.out$g1 <- general.data$g1
+  convergence.out$g0 <- general.data$g0
+  convergence.out$n1 <- general.data$n1
+  convergence.out$n0 <- general.data$n0
+  rownames(convergence.out) <- NULL
+  
+  
+  # posterior data
+  posterior <- data.frame(rstan::extract(posterior))
+  
+  
+  # ppc
+  ppc.fun <- function(p, x, n) {
+    return(stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*x))), size = n))
   }
-
-  if(file.exists(f.pkg)) {
-    model.stan <- stan_model(file = f.pkg, model_name = "model")
+  
+  ppc.1 <- apply(X = posterior[, c("alpha", "beta")], MARGIN = 1, 
+                 FUN = ppc.fun, x = 1, n = general.data$n1)
+  ppc.0 <- apply(X = posterior[, c("alpha", "beta")], MARGIN = 1, 
+                 FUN = ppc.fun, x = 0, n = general.data$n0)
+  bc <- getBhattacharyya(x = ppc.1/general.data$n1, 
+                         y = ppc.0/general.data$n0)$bc
+  ppc.1.hdi <- getHdi(vec = ppc.1/general.data$n1, 
+                      hdi.level = hdi.level)
+  ppc.0.hdi <- getHdi(vec = ppc.0/general.data$n0, 
+                      hdi.level = hdi.level)
+  
+  
+  # predicted vs real means
+  ppc.out <- data.frame(site = general.data$site,
+                        g1 = general.data$g1,
+                        g0 = general.data$g0,
+                        n1 = general.data$n1,
+                        n0 = general.data$n0,
+                        pred.mean.1 = mean(ppc.1/general.data$n1),
+                        pred.1.L = ppc.1.hdi[1],
+                        pred.1.H = ppc.1.hdi[2],
+                        pred.mean.0 = mean(ppc.0/general.data$n0),
+                        pred.0.L = ppc.0.hdi[1],
+                        pred.0.H = ppc.0.hdi[2],
+                        real.mean.1 = mean(data.list$Y[data.list$X == 1]),
+                        real.mean.0 = mean(data.list$Y[data.list$X == 0]))
+  
+  
+  # collect the stats
+  stats.out <- data.frame(site = general.data$site,
+                          g1 = general.data$g1,
+                          g0 = general.data$g0,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          beta.mean = stats["beta", "mean"],
+                          beta.se = stats["beta", "se_mean"],
+                          beta.sd = stats["beta", "sd"],
+                          beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
+                          beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
+                          alpha.mean = stats["alpha", "mean"],
+                          alpha.se = stats["alpha", "se_mean"],
+                          alpha.sd = stats["alpha", "sd"],
+                          alpha.L = stats["alpha", paste(hdi.L*100,"%",sep='')],
+                          alpha.H = stats["alpha", paste(hdi.H*100,"%",sep='')],
+                          bc = bc)
+  
+  
+  # special case for RPA
+  rpa.out <- NULL
+  if(rpa.iterations > 0) {
+    rpa.out <- getRpaDich(posterior = posterior,
+                          beta.mean = stats["beta", "mean"],
+                          site = general.data$site,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          g1 = general.data$g1, 
+                          g0 = general.data$g0,
+                          hdi.level = hdi.level, 
+                          rpa.iterations = rpa.iterations,
+                          model.stan = model.stan,
+                          mcmc.iterations = mcmc.iterations,
+                          mcmc.warmup = mcmc.warmup,
+                          mcmc.chains = mcmc.chains)
   }
-  if(file.exists(f.local)) {
-    model.stan <- stan_model(file = f.local, model_name = "model")
-  }
-
-  return(model.stan)
+  
+  # return
+  return (list(statistics.out = stats.out,
+               convergence.out = convergence.out,
+               rpa.out = rpa.out,
+               ppc.out = ppc.out,
+               stan.obj = stan.obj))
 }
 
+
+
+
+
+# Description:
+# Bayesian GLM with dichotomous outcome and a two-factor predictor.
+runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations, 
+                     mcmc.warmup, cores, hdi.level, model.stan, 
+                     rpa.iterations, with.stan.obj) {
+  
+  
+  # Description:
+  # Collection of results, ppc and rpa in case of hierarchical analysis
+  getResults <- function(j, data.list, general.data, posterior, 
+                         stats, hdi.level, mcmc.chains, mcmc.iterations, 
+                         mcmc.warmup, model.stan, rpa.iterations) {
+    
+    # ppc
+    ppc.fun <- function(p, x, n) {
+      # y <- stats::rnorm(n = 1, mean = p[1]+p[2]*x, sd = p[3])
+      return(stats::rbinom(n = 1, size = n, prob = 1/(1+exp(-(p[1]+p[2]*x)))))
+    }
+    
+    ppc.1 <- apply(X = posterior, MARGIN = 1, FUN = ppc.fun, 
+                   x = 1, n = general.data$n1)
+    ppc.0 <- apply(X = posterior, MARGIN = 1, FUN = ppc.fun, 
+                   x = 0, n = general.data$n0)
+    bc <- getBhattacharyya(x=ppc.1/general.data$n1, y=ppc.0/general.data$n0)$bc
+    ppc.1.hdi <- getHdi(vec = ppc.1/general.data$n1, hdi.level = hdi.level)
+    ppc.0.hdi <- getHdi(vec = ppc.0/general.data$n0, hdi.level = hdi.level)
+    
+    
+    # predicted vs real means
+    ppc.out <- data.frame(site = general.data$site,
+                          g1 = general.data$g1,
+                          g0 = general.data$g0,
+                          n1 = general.data$n1,
+                          n0 = general.data$n0,
+                          pred.mean.1 = mean(ppc.1/general.data$n1),
+                          pred.1.L = ppc.1.hdi[1],
+                          pred.1.H = ppc.1.hdi[2],
+                          pred.mean.0 = mean(ppc.0/general.data$n0),
+                          pred.0.L = ppc.0.hdi[1],
+                          pred.0.H = ppc.0.hdi[2],
+                          real.mean.1 = mean(data.list$Y[data.list$X == 1
+                                                         & data.list$S == j]),
+                          real.mean.0 = mean(data.list$Y[data.list$X == 0
+                                                         & data.list$S == j]))
+    
+    
+    # collect the stats
+    a.key <- paste("alpha[", j, "]", sep = '')
+    b.key <- paste("beta[", j, "]", sep = '')
+    stats.out <- data.frame(site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            beta.mean = stats[b.key, "mean"],
+                            beta.se = stats[b.key, "se_mean"],
+                            beta.sd = stats[b.key, "sd"],
+                            beta.L = stats[b.key,paste(hdi.L*100,"%",sep='')],
+                            beta.H = stats[b.key,paste(hdi.H*100,"%",sep='')],
+                            alpha.mean = stats[a.key, "mean"],
+                            alpha.se = stats[a.key, "se_mean"],
+                            alpha.sd = stats[a.key, "sd"],
+                            alpha.L =stats[a.key,paste(hdi.L*100,"%",sep='')],
+                            alpha.H =stats[a.key,paste(hdi.H*100,"%",sep='')],
+                            bc = bc)
+    
+    
+    # special case for RPA
+    rpa.out <- NULL
+    if(rpa.iterations > 0) {
+      colnames(posterior) <- c("alpha", "beta")
+      rpa.out <- getRpaDich(posterior = posterior,
+                            beta.mean = mean(posterior$beta),
+                            site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            hdi.level = hdi.level, 
+                            rpa.iterations = rpa.iterations,
+                            model.stan = rpa.model.stan,
+                            mcmc.iterations = mcmc.iterations,
+                            mcmc.warmup = mcmc.warmup,
+                            mcmc.chains = mcmc.chains)
+    }
+    
+    
+    # return
+    return (list(statistics.out = stats.out,
+                 rpa.out = rpa.out,
+                 ppc.out = ppc.out))
+  }
+  
+  
+  genphen.data$N <- 1
+  d.N <- stats::aggregate(formula = N~X+S+J+G, data = genphen.data, FUN = sum)
+  d.Y <- stats::aggregate(formula = Y~X+S+J+G, data = genphen.data, FUN = sum)
+  d <- merge(x = d.N, y = d.Y, by = c("X", "S", "J", "G"))
+  data.list <- list(X = d$X, Y = d$Y, N = d$N, Z = nrow(d), site = d$S, 
+                    S = d$J, S_N = max(d$J), G = d$G)
+  rm(genphen.data, d.N, d.Y, d)
+  
+  
+  # get initial parameter values
+  posterior <- rstan::sampling(object = model.stan,
+                               data = data.list,
+                               iter = mcmc.iterations,
+                               warmup = mcmc.warmup,
+                               chains = mcmc.chains,
+                               cores = cores,
+                               control = list(adapt_delta = 0.95, 
+                                              max_treedepth = 10),
+                               verbose = FALSE,
+                               refresh = -1)
+  
+  # if with.model == TRUE, keep the stan object
+  stan.obj <- NULL
+  if(with.stan.obj == TRUE) {
+    stan.obj <- posterior
+  }
+  
+  
+  # get general data
+  general.data <- c()
+  for(j in 1:max(data.list$S)) {
+    r <- data.frame(site = data.list$site[data.list$S == j & data.list$X == 1],
+                    S = data.list$S[data.list$S == j & data.list$X == 1],
+                    g1 = data.list$G[data.list$S == j & data.list$X == 1],
+                    g0 = data.list$G[data.list$S == j & data.list$X == 0],
+                    n1 = data.list$N[data.list$S == j & data.list$X == 1],
+                    n0 = data.list$N[data.list$S == j & data.list$X == 0],
+                    y1 = data.list$Y[data.list$S == j & data.list$X == 1],
+                    y0 = data.list$Y[data.list$S == j & data.list$X == 0],
+                    stringsAsFactors = FALSE)
+    general.data <- rbind(general.data, r)
+  }
+  rm(r, j)
+  
+  
+  # compute posterior summary
+  hdi.L <- (1-hdi.level)/2
+  hdi.H <- 1-(1-hdi.level)/2
+  stats <- rstan::summary(object = posterior, 
+                          pars = c("alpha", "beta", 
+                                   "mu_alpha", "mu_beta",
+                                   "sd_alpha", "sd_beta",
+                                   "nu_alpha", "nu_beta"), 
+                          prob = c(hdi.L, hdi.H))$summary
+  
+  
+  
+  # convergence data
+  convergence.out <- c()
+  c.row <- data.frame(stats[c("mu_alpha", "mu_beta", 
+                              "sd_alpha", "sd_beta",
+                              "nu_alpha", "nu_beta"), 
+                            c("Rhat", "n_eff")], 
+                      stringsAsFactors = FALSE)
+  c.row$par <- c("mu_alpha", "mu_beta", 
+                 "sd_alpha", "sd_beta", 
+                 "nu_alpha", "nu_beta")
+  c.row$site <- ''
+  c.row$g1 <- ''
+  c.row$g0 <- ''
+  c.row$n1 <- ''
+  c.row$n0 <- ''
+  convergence.out <- rbind(convergence.out, c.row)
+  for(j in 1:nrow(general.data)) {
+    c.row <- data.frame(stats[paste(c("alpha", "beta"), "[", j, "]", sep = ''), 
+                              c("Rhat", "n_eff")], stringsAsFactors = FALSE)
+    c.row$par <- c("alpha", "beta")
+    c.row$site <- general.data$site[j]
+    c.row$g1 <- general.data$g1[j]
+    c.row$g0 <- general.data$g0[j]
+    c.row$n1 <- general.data$n1[j]
+    c.row$n0 <- general.data$n0[j]
+    convergence.out <- rbind(convergence.out, c.row)
+  }
+  
+  
+  # posterior data
+  posterior <- data.frame(rstan::extract(posterior))
+  
+  
+  # special case for RPA, compile univariate stan model
+  if(rpa.iterations > 0) {
+    cat("======== Compiling RPA Model ======== \n")
+    rpa.model.stan <- compileModel(phenotype.type = "dichotomous", 
+                                   model.type = "univariate")
+  }
+  
+  
+  # register cluster and go through all snps to extract stats, ppc, rpa
+  cl <- parallel::makeCluster(cores)
+  doParallel::registerDoParallel(cl)
+  results <- (foreach(j = 1:nrow(general.data),
+                      .export = c("runDichU", "getHdi", "getGenphenData",
+                                  "getBhattacharyya", "getRpaDich"),
+                      .packages = c("rstan")) %dopar%
+                getResults(j = j,
+                           data.list = data.list,
+                           general.data = general.data[j, ],
+                           posterior = posterior[, c(paste(c("alpha", "beta"),
+                                                           j, sep = '.'))],
+                           stats = stats,
+                           hdi.level = hdi.level,
+                           mcmc.chains = mcmc.chains,
+                           mcmc.iterations = mcmc.iterations,
+                           mcmc.warmup = mcmc.warmup,
+                           model.stan = model.stan,
+                           rpa.iterations = rpa.iterations))
+  # stop cluster
+  parallel::stopCluster(cl = cl)
+  doParallel::stopImplicitCluster()
+  
+  
+  # rbind results
+  getO <- function(x, y) {
+    return(x[[y]])
+  }
+  stats.out <- do.call(rbind, lapply(X = results,FUN = getO,y="statistics.out"))
+  if(rpa.iterations == 0) {
+    rpa.out <- NULL
+  }
+  else {
+    rpa.out <- do.call(rbind, lapply(X = results, FUN = getO, y="rpa.out"))
+  }
+  ppc.out <- do.call(rbind, lapply(X = results, FUN = getO, y="ppc.out"))
+  
+  
+  # return
+  return (list(statistics.out = stats.out,
+               convergence.out = convergence.out,
+               rpa.out = rpa.out,
+               ppc.out = ppc.out,
+               stan.obj = stan.obj))
+}
 
 
 
@@ -1542,22 +1904,22 @@ compileModel <- function(phenotype.type) {
 # the phylogenetic bias related to each SNP.
 getPhyloBias <- function(genotype, k.matrix) {
   phylo.bias <- c()
-
+  
   # total mean phylogenetic distance
   mean.d.t <- mean(k.matrix[upper.tri(x = k.matrix, diag = FALSE)])
-
+  
   for(i in 1:ncol(genotype)) {
     gs <- unique(genotype[, i])
     for(g in gs) {
       # feature mean phylogenetic distance
       mean.d.f <- mean(k.matrix[genotype[, i] == g, genotype[, i] == g])
-
+      
       row <- data.frame(site = i, genotype = g, feature.dist = mean.d.f,
                         total.dist = mean.d.t, stringsAsFactors = FALSE)
       phylo.bias <- rbind(phylo.bias, row)
     }
   }
-
+  
   return(phylo.bias)
 }
 
@@ -1565,215 +1927,232 @@ getPhyloBias <- function(genotype, k.matrix) {
 
 
 
-# Description:
-# Given an estimate mean (M) and HDI with low (L) and high (H) intervals, as
-# well as a ROPE interval, check if the estimated interval overlaps with the
-# ROPE interval.
-getRopeTest <- function(ROPE, M, L, H) {
-  # min ROPE = 0
-  o <- ifelse(test = L <= 0 & H >= 0, yes = "fail", no = "pass")
-
-  # for ROPE > 0
-  if(ROPE > 0 & o == "pass") {
-    abs.L <- ifelse(test = M > 0, yes = L, no = abs(H))
-    o <- ifelse(test = abs.L <= ROPE, yes = "fail", no = "pass")
-  }
-
-  return (o)
-}
-
-
-
-
 
 # Description:
 # RPA for continuous data
-getRpaContinuous <- function(data.list, hdi.level, rpa.iterations,
-                             rpa.rope, posterior, model.stan,
-                             mcmc.iterations, mcmc.warmup,
-                             mcmc.chains, mcmc.cores) {
-
+getRpaCont <- function(posterior, beta.mean, site, g1, g0, n1, n0, 
+                       hdi.level, rpa.iterations, model.stan, 
+                       mcmc.iterations, mcmc.warmup, mcmc.chains) {
+  # ppc
+  rpaRun <- function(p, n1, n0, model.stan, mcmc.iterations,
+                     mcmc.warmup, mcmc.chains, hdi.level) {
+    
+    y1 <- p[1]+p[2]*1+p[3]*stats::rt(n = n1, df = p[4])
+    y0 <- p[1]+p[2]*0+p[3]*stats::rt(n = n0, df = p[4])
+    data.list <- list(X = rep(x = c(1, 0), times = c(n1, n0)),
+                      Y = c(y1, y0), Z = n0+n1)
+    
+    ppc.posterior <- rstan::sampling(object = model.stan,
+                                     data = data.list,
+                                     pars = c("alpha", "beta", "sigma", "nu"),
+                                     iter = mcmc.iterations,
+                                     warmup = mcmc.warmup,
+                                     chains = mcmc.chains,
+                                     cores = 1,
+                                     control = list(adapt_delta = 0.95,
+                                                    max_treedepth = 10),
+                                     verbose = FALSE,
+                                     refresh = -1)
+    
+    # compute posterior summary
+    hdi.L <- (1-hdi.level)/2
+    hdi.H <- 1-(1-hdi.level)/2
+    stats <- rstan::summary(object = ppc.posterior, 
+                            pars = c("alpha", "beta", "sigma", "nu"), 
+                            prob = c(hdi.L, hdi.H))$summary
+    
+    # return
+    return(data.frame(beta.mean = stats["beta", "mean"],
+                      beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
+                      beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
+                      stringsAsFactors = FALSE))
+  }
+  
   # get subset of posterior
   rpa.i <- sample(x = 1:nrow(posterior), size = rpa.iterations, replace = TRUE)
   posterior <- posterior[rpa.i, ]
-
-  # posterior data
-  statistics.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-      rpa.counter <- 0
-
-      for(k in 1:nrow(posterior)) {
-        mu.i <- posterior[k, paste("mu.", i, sep = '')]
-        sigma.i <- posterior[k, paste("sigma.", i, sep = '')]
-        mu.j <- posterior[k, paste("mu.", j, sep = '')]
-        sigma.j <- posterior[k, paste("sigma.", j, sep = '')]
-        nu <- posterior[k, "nu"]
-
-        # simulate new data
-        ppc.i <- mu.i+sigma.i*stats::rt(n = n.i, df = nu)
-        ppc.j <- mu.j+sigma.j*stats::rt(n = n.j, df = nu)
-
-
-        # new data for stan
-        phenotype <- c(ppc.i, ppc.j)
-        genotype <- matrix(c(rep(x = g.i, times = length(ppc.i)),
-                             rep(x = g.j, times = length(ppc.j))),
-                           ncol = 1)
-        ppc.data.list <- getGenphenData(genotype = genotype,
-                                        phenotype = phenotype,
-                                        phenotype.type = "continuous",
-                                        min.observations = 3)
-
-        # get initial parameter values
-        ppc.posterior <- sampling(object = model.stan,
-                                  data = ppc.data.list[[1]],
-                                  pars = c("mu", "sigma", "nu"),
-                                  iter = mcmc.iterations,
-                                  warmup = mcmc.warmup,
-                                  chains = mcmc.chains,
-                                  cores = mcmc.cores,
-                                  control = list(adapt_delta = 0.95,
-                                                 max_treedepth = 10),
-                                  verbose = FALSE,
-                                  refresh = -1)
-
-        # extract posterior
-        ppc.posterior <- data.frame(extract(ppc.posterior))
-        ppc.mu.i <- ppc.posterior[, "mu.1"]
-        ppc.sigma.i <- ppc.posterior[, "sigma.1"]
-        ppc.mu.j <- ppc.posterior[, "mu.2"]
-        ppc.sigma.j <- ppc.posterior[, "sigma.2"]
-
-        # cohen's d
-        cohens.d <- (ppc.mu.i-ppc.mu.j)/sqrt((ppc.sigma.i^2+ppc.sigma.j^2)/2)
-        M <- mean(cohens.d)
-        cohens.d.hdi <- getHdi(vec = cohens.d, hdi.level = hdi.level)
-        L = cohens.d.hdi[1]
-        H = cohens.d.hdi[2]
-
-        # compute if significant -> increment counter
-        rpa <- getRopeTest(ROPE = rpa.rope, M = M, L = L, H = H)
-        rpa.counter <- rpa.counter + sum(rpa == "pass")
-      }
-
-
-      # collect
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          rpa.counter = rpa.counter)
-      statistics.out <- rbind(statistics.out, stats)
-    }
-  }
-
-  return (statistics.out)
+  
+  
+  rpa <- apply(X = posterior[, c("alpha", "beta", "sigma", "nu")], MARGIN = 1, 
+               FUN = rpaRun, n1 = n1, n0 = n0, hdi.level = hdi.level, 
+               model.stan = model.stan, mcmc.iterations = mcmc.iterations, 
+               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains)
+  rpa <- do.call(rbind, rpa)
+  
+  
+  rpa$site <- site
+  rpa$g1 <- g1
+  rpa$g0 <- g0
+  rpa$n1 <- n1
+  rpa$n0 <- n0
+  
+  
+  # compute stats
+  # power error test
+  power.error <- ifelse(test = (rpa$beta.L <= 0 & rpa$beta.H >= 0), 
+                        yes = TRUE, no = FALSE)
+  power.error <- sum(power.error)/length(power.error)
+  
+  
+  # sign error test
+  sign.error <- ifelse(test = (rpa$beta.mean <= 0 & beta.mean >= 0) 
+                       | (rpa$beta.mean >= 0 & beta.mean <= 0), 
+                       yes = TRUE, no = FALSE)
+  sign.error <- sum(sign.error)/length(sign.error)
+  
+  
+  # mean and sd of RPA-estimated effect
+  rpa.beta.mean <- mean(rpa$beta.mean)
+  rpa.beta.sd <- sd(rpa$beta.mean)
+  
+  # collect stats
+  rpa.stats <- data.frame(site = site, 
+                          g1 = g1, g0 = g0, 
+                          n1 = n1, n0 = n0, 
+                          rpa.power.error = power.error, 
+                          rpa.sign.error = sign.error, 
+                          rpa.beta.mean = rpa.beta.mean, 
+                          rpa.beta.sd = rpa.beta.sd,
+                          rpa.N = nrow(rpa),
+                          stringsAsFactors = FALSE)
+  
+  return (rpa.stats)
 }
+
 
 
 
 
 # Description:
 # RPA for dichotomous data
-getRpaDichotomous <- function(data.list, hdi.level, rpa.iterations,
-                              rpa.rope, posterior, model.stan,
-                              mcmc.iterations, mcmc.warmup,
-                              mcmc.chains, mcmc.cores) {
-
+getRpaDich <- function(posterior, beta.mean, site, g1, g0, n1, n0, 
+                       hdi.level, rpa.iterations, model.stan, 
+                       mcmc.iterations, mcmc.warmup, mcmc.chains) {
+  
+  
+  # ppc
+  rpaRun <- function(p, n1, n0, model.stan, mcmc.iterations,
+                      mcmc.warmup, mcmc.chains, hdi.level) {
+    y1 <- stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*1))), size = n1)
+    y0 <- stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*0))), size = n0)
+    data.list <- list(X = c(1, 0), Y = c(y1, y0), N = c(n1, n0), Z = 2)
+    ppc.posterior <- rstan::sampling(object = model.stan,
+                                     data = data.list,
+                                     pars = c("alpha", "beta"),
+                                     iter = mcmc.iterations,
+                                     warmup = mcmc.warmup,
+                                     chains = mcmc.chains,
+                                     cores = 1,
+                                     control = list(adapt_delta = 0.95,
+                                                    max_treedepth = 10),
+                                     verbose = FALSE,
+                                     refresh = -1)
+    
+    # compute posterior summary
+    hdi.L <- (1-hdi.level)/2
+    hdi.H <- 1-(1-hdi.level)/2
+    stats <- rstan::summary(object = ppc.posterior, 
+                            pars = c("alpha", "beta"), 
+                            prob = c(hdi.L, hdi.H))$summary
+    
+    # return
+    return(data.frame(beta.mean = stats["beta", "mean"],
+                      beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
+                      beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
+                      stringsAsFactors = FALSE))
+  }
+  
+  
+  # ppc
+  rpaRun3 <- function(p, n1, n0, model.stan, mcmc.iterations,
+                     mcmc.warmup, mcmc.chains, hdi.level) {
+    
+    # sim Y1
+    y1 <- stats::rnorm(n = 1, mean = p[1]+p[2]*1, sd = p[3])
+    y1 <- 1/(1+exp(-y1))
+    y1 <- stats::rbinom(n = 1, prob = y1, size = n1)
+    
+    # sim Y0
+    y0 <- stats::rnorm(n = 1, mean = p[1]+p[2]*0, sd = p[3])
+    y0 <- 1/(1+exp(-y0))
+    y0 <- stats::rbinom(n = 1, prob = y0, size = n0)
+    
+    data.list <- list(X = c(1, 0), Y = c(y1, y0), N = c(n1, n0), Z = 2)
+    ppc.posterior <- rstan::sampling(object = model.stan,
+                                     data = data.list,
+                                     pars = c("alpha", "beta"),
+                                     iter = mcmc.iterations,
+                                     warmup = mcmc.warmup,
+                                     chains = mcmc.chains,
+                                     cores = 1,
+                                     control = list(adapt_delta = 0.95,
+                                                    max_treedepth = 10),
+                                     verbose = FALSE,
+                                     refresh = -1)
+    
+    # compute posterior summary
+    hdi.L <- (1-hdi.level)/2
+    hdi.H <- 1-(1-hdi.level)/2
+    stats <- rstan::summary(object = ppc.posterior, 
+                            pars = c("alpha", "beta"), 
+                            prob = c(hdi.L, hdi.H))$summary
+    
+    # return
+    return(data.frame(beta.mean = stats["beta", "mean"],
+                      beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
+                      beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
+                      stringsAsFactors = FALSE))
+  }
+  
   # get subset of posterior
   rpa.i <- sample(x = 1:nrow(posterior), size = rpa.iterations, replace = TRUE)
   posterior <- posterior[rpa.i, ]
-
-  # posterior data
-  statistics.out <- c()
-  for(i in 1:(max(data.list$X) - 1)) {
-    for(j in (i + 1):max(data.list$X)) {
-      # general data
-      site <- data.list$site
-      n.i <- data.list$Ng[i]
-      n.j <- data.list$Ng[j]
-      g.i <- data.list$G[data.list$X == i][1]
-      g.j <- data.list$G[data.list$X == j][1]
-      mutation <- paste(g.i, "->", g.j, sep = '')
-      general <- paste(g.i, ":", n.i, ", ", g.j, ":", n.j, sep = '')
-      rpa.counter <- 0
-
-      for(k in 1:nrow(posterior)) {
-        mu.i <- posterior[k, paste("mu.", i, sep = '')]
-        mu.j <- posterior[k, paste("mu.", j, sep = '')]
-
-        # simulate new data
-        ppc.i <- stats::rbinom(n = n.i, prob = mu.i, size = 1)
-        ppc.j <- stats::rbinom(n = n.j, prob = mu.j, size = 1)
-
-        # new data for stan
-        phenotype <- c(ppc.i, ppc.j)
-        genotype <- matrix(c(rep(x = g.i, times = length(ppc.i)),
-                             rep(x = g.j, times = length(ppc.j))),
-                           ncol = 1)
-        ppc.data.list <- getGenphenData(genotype = genotype,
-                                        phenotype = phenotype,
-                                        phenotype.type = "dichotomous",
-                                        min.observations = 3)
-
-        # get initial parameter values
-        ppc.posterior <- sampling(object = model.stan,
-                                  data = ppc.data.list[[1]],
-                                  pars = c("mu"),
-                                  iter = mcmc.iterations,
-                                  warmup = mcmc.warmup,
-                                  chains = mcmc.chains,
-                                  cores = mcmc.cores,
-                                  control = list(adapt_delta = 0.95,
-                                                 max_treedepth = 10),
-                                  verbose = FALSE,
-                                  refresh = -1)
-
-        # extract posterior
-        ppc.posterior <- data.frame(extract(ppc.posterior))
-        ppc.mu.i <- ppc.posterior[, "mu.1"]
-        ppc.mu.j <- ppc.posterior[, "mu.2"]
-
-        # absolute d
-        absolute.d <- ppc.mu.i - ppc.mu.j
-        absolute.d.hdi <- getHdi(vec = absolute.d, hdi.level = hdi.level)
-        M <- mean(absolute.d)
-        L <- absolute.d.hdi[1]
-        H <- absolute.d.hdi[2]
-
-        # compute if significant -> increment counter
-        rpa <- getRopeTest(ROPE = rpa.rope, M = M, L = L, H = H)
-        rpa.counter <- rpa.counter + sum(rpa == "pass")
-      }
-
-
-      # collect
-      stats <- data.frame(site = site,
-                          general = general,
-                          mutation = mutation,
-                          rpa.counter = rpa.counter)
-      statistics.out <- rbind(statistics.out, stats)
-    }
-  }
-
-  return (statistics.out)
+  
+  rpa <- apply(X = posterior[, c("alpha", "beta")], MARGIN = 1, 
+               FUN = rpaRun, n1 = n1, n0 = n0, hdi.level = hdi.level, 
+               model.stan = model.stan, mcmc.iterations = mcmc.iterations, 
+               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains)
+  rpa <- do.call(rbind, rpa)
+  rpa$site <- site
+  rpa$g1 <- g1
+  rpa$g0 <- g0
+  rpa$n1 <- n1
+  rpa$n0 <- n0
+  
+  
+  # compute stats
+  # power error test
+  power.error <- ifelse(test = (rpa$beta.L <= 0 & rpa$beta.H >= 0), 
+                        yes = TRUE, no = FALSE)
+  power.error <- sum(power.error)/length(power.error)
+  
+  
+  # sign error test
+  sign.error <- ifelse(test = (rpa$beta.mean <= 0 & beta.mean >= 0) 
+                       | (rpa$beta.mean >= 0 & beta.mean <= 0), 
+                       yes = TRUE, no = FALSE)
+  sign.error <- sum(sign.error)/length(sign.error)
+  
+  
+  # mean and sd of RPA-estimated effect
+  rpa.beta.mean <- mean(rpa$beta.mean)
+  rpa.beta.sd <- sd(rpa$beta.mean)
+  
+  
+  # collect stats
+  rpa.stats <- data.frame(site = site, 
+                          g1 = g1, g0 = g0, 
+                          n1 = n1, n0 = n0, 
+                          rpa.power.error = power.error, 
+                          rpa.sign.error = sign.error, 
+                          rpa.beta.mean = rpa.beta.mean, 
+                          rpa.beta.sd = rpa.beta.sd,
+                          rpa.N = nrow(rpa),
+                          stringsAsFactors = FALSE)
+  
+  return (rpa.stats)
 }
 
-
-
-# Description:
-# Posterior predictive check
-getPpc <- function() {
-
-}
 
 
 

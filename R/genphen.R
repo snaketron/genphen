@@ -5,146 +5,246 @@
 runGenphen <- function(genotype = NULL,
                        phenotype = NULL,
                        phenotype.type = NULL,
+                       model.type = NULL,
                        mcmc.chains = 2,
-                       mcmc.iterations = 1000,
+                       mcmc.iterations = 2500,
                        mcmc.warmup = 500,
-                       mcmc.cores = 1,
+                       cores = 1,
                        hdi.level = 0.95,
                        stat.learn.method = "rf",
                        cv.iterations = 1000,
-                       with.rpa = FALSE,
                        rpa.iterations = 0,
-                       rpa.rope = 0) {
-
+                       with.stan.obj = FALSE) {
+  
+  
   # check inputs
   checkInput(genotype = genotype,
              phenotype = phenotype,
              phenotype.type = phenotype.type,
+             model.type = model.type,
              mcmc.chains = mcmc.chains,
              mcmc.iterations = mcmc.iterations,
              mcmc.warmup = mcmc.warmup,
-             mcmc.cores = mcmc.cores,
+             cores = cores,
              hdi.level = hdi.level,
              stat.learn.method = stat.learn.method,
-             cv.iterations = cv.iterations)
-
-
+             cv.iterations = cv.iterations,
+             rpa.iterations = rpa.iterations,
+             with.stan.obj = with.stan.obj)
+  
+  
   # convert AAMultipleAlignment to matrix if needed
   genotype <- convertMsaToGenotype(genotype = genotype)
-
-
+  
+  
   # if vector genotype => matrix genotype
   if(is.vector(genotype)) {
     genotype <- matrix(data = genotype, ncol = 1)
   }
-
-
-  # genphen.data
+  
+  
+  # if phenotype = dichotomous => convert to 1s and 0s
+  if(phenotype.type == "dichotomous") {
+    phenotype.new <- as.numeric(as.factor(phenotype))-1
+    cat("Phenotype mapping to 1s and 0s: \n")
+    print(table(phenotype.new, phenotype))
+  }
+  
+  
+  # genphen.data and final check for input
   genphen.data <- getGenphenData(genotype = genotype,
                                  phenotype = phenotype,
-                                 phenotype.type = phenotype.type,
-                                 min.observations = 3)
-
-
+                                 cores = cores)
+  if(is.null(genphen.data)) {
+    stop("No genphen input data found.")
+  }
+  
+  
   # compile model
-  model.stan <- compileModel(phenotype.type = phenotype.type)
-
-
-  convergence <- NULL
-  results <- NULL
-  cas <- NULL
-  rpa <- NULL
-  ppc <- NULL
-  for(s in 1:length(genphen.data)) {
+  cat("======== Compiling Main Model ======== \n")
+  model.stan <- compileModel(phenotype.type = phenotype.type, 
+                             model.type = model.type)
+  
+  
+  j <- NULL
+  if(model.type == "univariate") {
+    cat("======== Main Analysis Running (Univariate) ======== \n")
+    # register parallel
+    cl <- parallel::makeCluster(cores)
+    doParallel::registerDoParallel(cl)
     if(phenotype.type == "continuous") {
-
-      progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
-      cat("======== Main Analysis Progress: ", progress.indicator, "% ",
-          "site = ", genphen.data[[s]]$site, "======== \n")
-      o <- runContinuous(data.list = genphen.data[[s]],
-                         mcmc.chains = mcmc.chains,
-                         mcmc.iterations = mcmc.iterations,
-                         mcmc.warmup = mcmc.warmup,
-                         mcmc.cores = mcmc.cores,
-                         hdi.level = hdi.level,
-                         model.stan = model.stan,
-                         with.rpa = with.rpa,
-                         rpa.iterations = rpa.iterations,
-                         rpa.rope = rpa.rope)
+      o <- (foreach(j = 1:max(genphen.data$J),
+                    .export = c("runContU", "getHdi", "getGenphenData",
+                                "getBhattacharyya", "getRpaCont"), 
+                    .packages = c("rstan"))
+            %dopar% runContU(genphen.data = genphen.data[genphen.data$J == j, ],
+                             mcmc.chains = mcmc.chains,
+                             mcmc.iterations = mcmc.iterations,
+                             mcmc.warmup = mcmc.warmup,
+                             cores = 1,
+                             hdi.level = hdi.level,
+                             model.stan = model.stan,
+                             rpa.iterations = rpa.iterations,
+                             with.stan.obj = with.stan.obj))
     }
     else if(phenotype.type == "dichotomous") {
-      progress.indicator <- round(s/length(genphen.data)*100, digits = 2)
-      cat("======== Main Analysis Progress: ", progress.indicator, "% ",
-          "site = ", genphen.data[[s]]$site, "======== \n")
-      o <- runDichotomous(data.list = genphen.data[[s]],
-                          mcmc.chains = mcmc.chains,
-                          mcmc.iterations = mcmc.iterations,
-                          mcmc.warmup = mcmc.warmup,
-                          mcmc.cores = mcmc.cores,
-                          hdi.level = hdi.level,
-                          model.stan = model.stan,
-                          with.rpa = with.rpa,
-                          rpa.iterations = rpa.iterations,
-                          rpa.rope = rpa.rope)
+      o <- (foreach(j = 1:max(genphen.data$J),
+                    .export = c("runDichU", "getHdi", "getGenphenData",
+                                "getBhattacharyya", "getRpaDich"), 
+                    .packages = c("rstan"))
+            %dopar% runDichU(genphen.data = genphen.data[genphen.data$J == j, ],
+                             mcmc.chains = mcmc.chains,
+                             mcmc.iterations = mcmc.iterations,
+                             mcmc.warmup = mcmc.warmup,
+                             cores = 1,
+                             hdi.level = hdi.level,
+                             model.stan = model.stan,
+                             rpa.iterations = rpa.iterations,
+                             with.stan.obj = with.stan.obj))
     }
-
-
-
-    cat("=================== Statistical Learning ==================== \n")
-    # CA
-    if(stat.learn.method == "none") {
-      ca <- getNoneCa(data.list = genphen.data[[s]])
-    }
-    else if(stat.learn.method == "rf") {
-      ca <- getRfCa(data.list = genphen.data[[s]],
-                    cv.fold = 0.7,
-                    cv.steps = cv.iterations,
-                    hdi.level = hdi.level,
-                    ntree = 1000,
-                    mcmc.cores = mcmc.cores)
-    }
-    else if(stat.learn.method == "svm") {
-      ca <- getSvmCa(data.list = genphen.data[[s]],
-                     cv.fold = 0.7,
-                     cv.steps = cv.iterations,
-                     hdi.level = hdi.level,
-                     mcmc.cores = mcmc.cores)
-    }
-
-
-    # append results
-    results <- rbind(results, o$statistics.out)
-    cas <- rbind(cas, ca)
-    convergence <- rbind(convergence, o$convergence.out)
-    rpa <- rbind(rpa, o$rpa.out)
-    ppc <- rbind(ppc, o$ppc.out)
+    # stop cluster
+    parallel::stopCluster(cl = cl)
+    doParallel::stopImplicitCluster()
   }
-
-
-
+  
+  if(model.type == "hierarchical") {
+    cat("======== Main Analysis Running (Hierarchical) ======== \n")
+    if(phenotype.type == "continuous") {
+      o <- runContH(genphen.data = genphen.data,
+                    mcmc.chains = mcmc.chains,
+                    mcmc.iterations = mcmc.iterations,
+                    mcmc.warmup = mcmc.warmup,
+                    cores = cores,
+                    hdi.level = hdi.level,
+                    model.stan = model.stan,
+                    rpa.iterations = rpa.iterations,
+                    with.stan.obj = with.stan.obj)
+    }
+    else if(phenotype.type == "dichotomous") {
+      o <- runDichH(genphen.data = genphen.data,
+                    mcmc.chains = mcmc.chains,
+                    mcmc.iterations = mcmc.iterations,
+                    mcmc.warmup = mcmc.warmup,
+                    cores = cores,
+                    hdi.level = hdi.level,
+                    model.stan = model.stan,
+                    rpa.iterations = rpa.iterations,
+                    with.stan.obj = with.stan.obj)
+    }
+  }
+  
+  
+  cat("======== Statistical Learning ======== \n")
+  # register parallel
+  cl <- parallel::makeCluster(cores)
+  doParallel::registerDoParallel(cl)
+  if(stat.learn.method == "none") {
+    cas <- (foreach(j = 1:max(genphen.data$J),
+                    .export = c("getNoneCa"),
+                    .packages = c("ranger")) %dopar%
+              getNoneCa(genphen.data = genphen.data[genphen.data$J == j, ]))
+  }
+  else if(stat.learn.method == "rf") {
+    cas <- (foreach(j = 1:max(genphen.data$J),
+                    .export = c("getRfCa", "getHdi", "getKappa"),
+                    .packages = c("ranger")) %dopar%
+              getRfCa(genphen.data = genphen.data[genphen.data$J == j, ],
+                      cv.fold = 0.66,
+                      cv.steps = cv.iterations,
+                      hdi.level = hdi.level,
+                      ntree = 1000))
+  }
+  else if(stat.learn.method == "svm") {
+    cas <- (foreach(j = 1:max(genphen.data$J),
+                    .export = c("getSvmCa", "getHdi", "getKappa"), 
+                    .packages = c("e1071")) %dopar% 
+              getSvmCa(genphen.data = genphen.data[genphen.data$J == j, ],
+                       cv.fold = 0.66,
+                       cv.steps = cv.iterations,
+                       hdi.level = hdi.level))
+  }
+  # stop cluster
+  parallel::stopCluster(cl = cl)
+  doParallel::stopImplicitCluster()
+  
+  
+  # assemble results - univariate
+  if(model.type == "univariate") {
+    getO <- function(x, y) {
+      return(x[[y]])
+    }
+    getS <- function(x, y) {
+      return(x[[y]])
+    }
+    
+    
+    results <- do.call(rbind, lapply(X = o, FUN = getO, y="statistics.out"))
+    convergence <- do.call(rbind, lapply(X = o, FUN = getO,y="convergence.out"))
+    if(rpa.iterations == 0) {
+      rpa <- NULL
+    }
+    else {
+      rpa <- do.call(rbind, lapply(X = o, FUN = getO, y="rpa.out"))
+    }
+    ppc <- do.call(rbind, lapply(X = o, FUN = getO, y="ppc.out"))
+    cas <- do.call(rbind, cas)
+    stan.obj <- lapply(X = o, FUN = getS, y = "stan.obj")
+  }
+  
+  
+  # assemble results - hierarchical
+  if(model.type == "hierarchical") {
+    results <- o[["statistics.out"]]
+    convergence <- o[["convergence.out"]]
+    rpa <- o[["rpa.out"]]
+    ppc <- o[["ppc.out"]]
+    cas <- do.call(rbind, cas)
+    stan.obj <- o[["stan.obj"]]
+  }
+  
+  
   # merge effect sizes and cas
   scores <- merge(x = results, y = cas, all = TRUE,
-                  by = c("site", "mutation", "general"))
+                  by = c("site", "g1", "g0", "n1", "n0"))
+  
+  
   if(phenotype.type == "continuous") {
-    nice.scores <- scores[, c("site", "mutation", "general",
-                              "cohens.d", "cohens.d.L", "cohens.d.H",
-                              "ca", "ca.L", "ca.H",
-                              "kappa", "kappa.L", "kappa.H",
-                              "bc",
-                              "sd.d", "sd.d.L", "sd.d.H")]
-  }
-  else if(phenotype.type == "dichotomous") {
-    nice.scores <- scores[, c("site", "mutation", "general",
-                              "absolute.d", "absolute.d.L", "absolute.d.H",
+    # format scores nicely
+    nice.scores <- scores[, c("site", "g1", "g0",
+                              "beta.mean", "beta.L", "beta.H", "beta.sd",
+                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+                              "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
+                              "nu.mean", "nu.L", "nu.H", "nu.sd",
                               "ca", "ca.L", "ca.H",
                               "kappa", "kappa.L", "kappa.H",
                               "bc")]
   }
+  if(phenotype.type == "dichotomous") {
+    # format scores nicely
+    nice.scores <- scores[, c("site", "g1", "g0",
+                              "beta.mean", "beta.L", "beta.H", "beta.sd",
+                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+                              "ca", "ca.L", "ca.H",
+                              "kappa", "kappa.L", "kappa.H",
+                              "bc")]
+  }
+  
+  
+  # order by genotype site
+  nice.scores <- nice.scores[order(nice.scores$site, decreasing = FALSE), ]
+  convergence <- convergence[order(convergence$site, decreasing = FALSE), ]
+  scores <- scores[order(scores$site, decreasing = FALSE), ]
+  if(is.null(rpa) == FALSE) {
+    rpa <- rpa[order(rpa$site, decreasing = FALSE), ]
+  }
+  
+  # return
   return(list(scores = nice.scores,
               convergence = convergence,
               debug.scores = scores,
               rpa = rpa,
-              ppc = ppc))
+              ppc = ppc,
+              stan.obj = stan.obj))
 }
 
 
@@ -153,155 +253,197 @@ runGenphen <- function(genotype = NULL,
 runDiagnostics <- function(genotype = NULL,
                            phenotype = NULL,
                            phenotype.type = NULL,
-                           rf.importance.trees = 50000,
-                           with.anchor.points = FALSE,
+                           rf.trees = 5000,
                            mcmc.chains = 2,
-                           mcmc.iterations = 1000,
+                           mcmc.iterations = 2500,
                            mcmc.warmup = 500,
-                           mcmc.cores = 1,
+                           cores = 1,
                            hdi.level = 0.95,
-                           anchor.points = c(1:5)) {
-
+                           diagnostic.points = NULL) {
+  
+  
   # check inputs
   checkInput(genotype = genotype,
              phenotype = phenotype,
              phenotype.type = phenotype.type,
+             model.type = "univariate",
              mcmc.chains = mcmc.chains,
              mcmc.iterations = mcmc.iterations,
              mcmc.warmup = mcmc.warmup,
-             mcmc.cores = mcmc.cores,
+             cores = cores,
              hdi.level = hdi.level,
              stat.learn.method = "none",
-             cv.iterations = 0)
-
+             cv.iterations = 0,
+             rpa.iterations = 0,
+             with.stan.obj = FALSE)
+  
+  
   # convert AAMultipleAlignment to matrix if needed
   genotype <- convertMsaToGenotype(genotype = genotype)
-
-
+  
+  
   # if vector genotype => matrix genotype
   if(is.vector(genotype)) {
     genotype <- matrix(data = genotype, ncol = 1)
   }
-
-
+  
+  
   # check input diagnostics
   checkInputDiagnostics(genotype = genotype,
-                        anchor.points = anchor.points,
-                        with.anchor.points = with.anchor.points,
-                        rf.importance.trees = rf.importance.trees)
-
-
+                        diagnostic.points = diagnostic.points,
+                        rf.trees = rf.trees)
+  
+  
   # find importances: prepare for ranger
-  rf.data <- data.frame(genotype, stringsAsFactors = FALSE)
+  rf.data <- data.frame(genotype)
   if(phenotype.type == "continuous") {
     rf.data$phenotype <- phenotype
   }
   if(phenotype.type == "dichotomous") {
     rf.data$phenotype <- as.factor(phenotype)
   }
-
-
+  
+  
   # ranger: importance dataset
+  cat("======== RF diagnostics ======== \n")
   rf.out <- ranger::ranger(dependent.variable.name = "phenotype",
-                           data = rf.data, importance = "impurity",
-                           num.trees = rf.importance.trees)
+                           importance = "impurity",
+                           data = rf.data, 
+                           num.trees = rf.trees)
   rf.out <- data.frame(site = 1:length(rf.out$variable.importance),
                        importance = rf.out$variable.importance,
                        stringsAsFactors = FALSE)
-  genotype <- genotype[, order(rf.out$importance, decreasing = TRUE)]
   rf.out <- rf.out[order(rf.out$importance, decreasing = TRUE), ]
   rf.out$importance.rank <- 1:nrow(rf.out)
-
-
-  # if only RF analysis asked, then return importances only
-  if(with.anchor.points == FALSE) {
-    return (list(scores = NA, importance.scores = rf.out))
+  
+  
+  
+  # if diagnostic points are not provided, return the RF scores
+  if(is.null(diagnostic.points) == TRUE ||
+     length(diagnostic.points) == 0 ||
+     is.na(diagnostic.points) == TRUE) {
+    cat("No diagnostic points provided, only importance analysis performed.\n")
+    return(list(scores = NA, 
+                importance.scores = rf.out))
   }
-
-
+  
+  
+  
+  # genphen.data and final check for input
+  genphen.data <- getGenphenData(genotype = genotype,
+                                 phenotype = phenotype,
+                                 cores = cores)
+  
+  
+  if(is.null(genphen.data)) {
+    stop("No genphen input data found with these diagnostic points.")
+  }
+  
+  # in case of duplicate diagnostic points
+  diagnostic.points <- unique(diagnostic.points)
+  # actual anchor points
+  anchors <- data.frame(real.anchors = rf.out$site[diagnostic.points],
+                        diagnostic.points = diagnostic.points,
+                        stringsAsFactors = FALSE)
+  # check if given anchor points are too conserved to be used for the analysis
+  anchors$miss <- ifelse(test = !anchors$real.anchors %in% genphen.data$S,
+                         yes = TRUE, no = FALSE)
+  if(sum(anchors$miss) != 0) {
+    warning(paste(sum(anchors$miss), " anchor points are conserved, cannot be ",
+                  "analyzed: ", paste(anchors$real.anchors[anchors$miss==TRUE], 
+                                      collapse = ','), sep =''))
+  }
+  
+  
+  # final genphen data
+  real.anchors <- anchors$real.anchors[anchors$miss == FALSE]
+  genphen.data <- genphen.data[genphen.data$S %in% real.anchors, ]
+  if(is.null(genphen.data)) {
+    stop("No genphen input data found with these anchor points.")
+  }
+  genphen.data <- merge(x = genphen.data, y = anchors,
+                        by.x = "S", by.y = "real.anchors")
+  
+  
   # compile model
-  model.stan <- compileModel(phenotype.type = phenotype.type)
-
-
-  results <- NULL
-  cas <- NULL
-  for(p in anchor.points) {
-    genotype.data <- matrix(data = genotype[, p], ncol = 1)
-    phenotype.data <- phenotype
-
-
-    # genphen.data
-    genphen.data <- getGenphenData(genotype = genotype.data,
-                                   phenotype = phenotype.data,
-                                   phenotype.type = phenotype.type,
-                                   min.observations = 3)
-
-
-    if(length(genphen.data) != 0) {
-      for(s in 1:length(genphen.data)) {
-        cat("============================================================= \n")
-        cat("=========== Anchor point:", p, " progress: ",
-            round(s/length(genphen.data)*100, digits = 2), " % =========== \n")
-        cat("============================================================= \n")
-
-
-        if(phenotype.type == "continuous") {
-          o <- runContinuous(data.list = genphen.data[[s]],
-                             mcmc.chains = mcmc.chains,
-                             mcmc.iterations = mcmc.iterations,
-                             mcmc.warmup = mcmc.warmup,
-                             mcmc.cores = mcmc.cores,
-                             hdi.level = hdi.level,
-                             model.stan = model.stan,
-                             with.rpa = FALSE,
-                             rpa.iterations = 0,
-                             rpa.rope = 0)
-        }
-        else if(phenotype.type == "dichotomous") {
-          o <- runDichotomous(data.list = genphen.data[[s]],
-                              mcmc.chains = mcmc.chains,
-                              mcmc.iterations = mcmc.iterations,
-                              mcmc.warmup = mcmc.warmup,
-                              mcmc.cores = mcmc.cores,
-                              hdi.level = hdi.level,
-                              model.stan = model.stan,
-                              with.rpa = FALSE,
-                              rpa.iterations = 0,
-                              rpa.rope = 0)
-        }
-
-
-        # add marker for diagnostics
-        o$statistics.out$anchor.point <- p
-
-
-        # append results
-        results <- rbind(results, o$statistics.out)
-      }
-    }
-    else {
-      if(phenotype.type == "continuous") {
-        dummy.stats <- data.frame(site = NA, general = NA, mutation = NA,
-                                  cohens.d = NA, cohens.d.L = NA,
-                                  cohens.d.H = NA, cohens.d.hdi = NA,
-                                  bc = 1, anchor.point = p,
-                                  stringsAsFactors = FALSE)
-      }
-      else if(phenotype.type == "dichotomous") {
-        dummy.stats <- data.frame(site = NA, general = NA, mutation = NA,
-                                  absolute.d = NA, absolute.d.L = NA,
-                                  absolute.d.H = NA, absolute.d.hdi = NA,
-                                  bc = 1, anchor.point = p,
-                                  stringsAsFactors = FALSE)
-      }
-      # append results
-      results <- rbind(results, dummy.stats)
-    }
+  cat("======== Compiling Diagnostic Model ======== \n")
+  model.stan <- compileModel(phenotype.type = phenotype.type, 
+                             model.type = "univariate")
+  
+  
+  cat("======== Main Analysis Running ======== \n")
+  # register parallel
+  cl <- parallel::makeCluster(cores)
+  doParallel::registerDoParallel(cl)
+  Js <- unique(genphen.data$J)
+  j <- NULL
+  if(phenotype.type == "continuous") {
+    o <- (foreach(j = 1:length(Js),
+                  .export = c("runContU", "getHdi", "getGenphenData",
+                              "getBhattacharyya", "getRpaCont"), 
+                  .packages = c("rstan"))
+          %dopar% runContU(genphen.data = genphen.data[genphen.data$J==Js[j],],
+                           mcmc.chains = mcmc.chains,
+                           mcmc.iterations = mcmc.iterations,
+                           mcmc.warmup = mcmc.warmup,
+                           cores = 1,
+                           hdi.level = hdi.level,
+                           model.stan = model.stan,
+                           rpa.iterations = 0))
   }
-
-  scores <- results
-  scores <- scores[order(scores$anchor.point, decreasing = FALSE), ]
-  return(list(scores = scores, importance.scores = rf.out))
+  else if(phenotype.type == "dichotomous") {
+    o <- (foreach(j = 1:length(Js),
+                  .export = c("runDichU", "getHdi", "getGenphenData",
+                              "getBhattacharyya", "getRpaDich"), 
+                  .packages = c("rstan"))
+          %dopar% runDichU(genphen.data = genphen.data[genphen.data$J==Js[j],],
+                           mcmc.chains = mcmc.chains,
+                           mcmc.iterations = mcmc.iterations,
+                           mcmc.warmup = mcmc.warmup,
+                           cores = 1,
+                           hdi.level = hdi.level,
+                           model.stan = model.stan,
+                           rpa.iterations = 0))
+  }
+  # stop cluster
+  parallel::stopCluster(cl = cl)
+  doParallel::stopImplicitCluster()
+  
+  
+  # assemble results - univariate
+  getO <- function(x, y) {
+    return(x[[y]])
+  }
+  scores <- do.call(rbind, lapply(X = o, FUN = getO, y="statistics.out"))
+  
+  
+  # merge
+  scores <- merge(x = scores, 
+                  y = anchors[, c("real.anchors", "diagnostic.points")], 
+                  by.x = "site", by.y = "real.anchors", all.x = TRUE)
+  
+  
+  
+  if(phenotype.type == "continuous") {
+    # format scores nicely
+    nice.scores <- scores[, c("site", "g1", "g0",
+                              "beta.mean", "beta.L", "beta.H", "beta.sd",
+                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+                              "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
+                              "nu.mean", "nu.L", "nu.H", "nu.sd",
+                              "bc", "diagnostic.points")]
+  }
+  if(phenotype.type == "dichotomous") {
+    # format scores nicely
+    nice.scores <- scores[, c("site", "g1", "g0",
+                              "beta.mean", "beta.L", "beta.H", "beta.sd",
+                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+                              "bc", "diagnostic.points")]
+  }
+  
+  
+  return(list(scores = nice.scores, 
+              importance.scores = rf.out))
 }
 
 
@@ -309,19 +451,19 @@ runDiagnostics <- function(genotype = NULL,
 
 runPhyloBiasCheck <- function(input.kinship.matrix = NULL,
                               genotype = NULL) {
-
+  
   # check params
   checkInputPhyloBias(input.kinship.matrix = input.kinship.matrix,
                       genotype = genotype)
-
+  
   # convert AAMultipleAlignment to matrix if needed
   genotype <- convertMsaToGenotype(genotype = genotype)
-
+  
   # if vector genotype => matrix genotype
   if(is.vector(genotype)) {
     genotype <- matrix(data = genotype, ncol = 1)
   }
-
+  
   # compute kinship if needed
   if(is.null(input.kinship.matrix) | missing(input.kinship.matrix)) {
     kinship.matrix <- e1071::hamming.distance(genotype)
@@ -329,37 +471,39 @@ runPhyloBiasCheck <- function(input.kinship.matrix = NULL,
   else {
     kinship.matrix <- input.kinship.matrix
   }
-
+  
   # compute bias
   bias <- getPhyloBias(genotype = genotype, k.matrix = kinship.matrix)
-
+  
   # bias = 1-dist(feature)/dist(total)
   bias$bias <- 1-bias$feature.dist/bias$total.dist
-
-  # get mutations
-  bias.mutations <- c()
-  sites <- unique(bias$site)
-  for(s in sites) {
-    s.bias <- bias[bias$site == s, ]
-    genotypes <- sort(unique(s.bias$genotype))
-    if(length(genotypes) != 1) {
-      for(g1 in 1:(length(genotypes) - 1)) {
-        bias1 <- s.bias$bias[s.bias$genotype == genotypes[g1]]
-        for(g2 in (g1 + 1):length(genotypes)) {
-          bias2 <- s.bias$bias[s.bias$genotype == genotypes[g2]]
-          mutation <- paste(genotypes[g1], genotypes[g2], sep = "->")
-          mutation.row <- data.frame(site = s, mutation = mutation,
-                                     bias = max(bias1, bias2))
-          bias.mutations <- rbind(bias.mutations, mutation.row)
-        }
-      }
-    }
+  
+  # gen.data and final check for input
+  gen.data <- getGenSummary(genotype = genotype)
+  if(is.null(gen.data)) {
+    stop("No genphen input data found.")
   }
-
-
-  return (list(bias = bias[, c("site", "genotype", "bias")],
-               kinship.matrix = kinship.matrix,
-               bias.mutations = bias.mutations))
+  
+  # append bias to each SNP
+  gen.data$bias.g1 <- NA
+  gen.data$bias.g0 <- NA
+  gen.data$bias <- NA
+  for(i in 1:nrow(gen.data)) {
+    bias.g1 <- bias[bias$site == gen.data$site[i] 
+                    & bias$genotype == gen.data$g1[i], ]
+    bias.g0 <- bias[bias$site == gen.data$site[i] 
+                    & bias$genotype == gen.data$g0[i], ]
+    gen.data$bias.g1[i] <- bias.g1$bias[1]
+    gen.data$bias.g0[i] <- bias.g0$bias[1]
+    gen.data$bias[i] <- max(bias.g1$bias[1], bias.g0$bias[1])
+  }
+  
+  
+  # sort by site
+  bias <- gen.data[, c("site", "g1", "g0", "bias.g1", "bias.g0", "bias")]
+  bias <- bias[order(bias$site, decreasing = FALSE), ]
+  
+  return (list(bias = bias, kinship.matrix = kinship.matrix))
 }
 
 

@@ -1,0 +1,22 @@
+var;val;def
+MIN.OBS;1;minimum number of observations in each group of a SNP, for SNP to be analyzed
+cv.fold;0.66;proportion of data to be used for training during cross-validation 
+ntree;1000;number of trees built during learning with random forest
+e;0.01;convergence error of the classification accuracy (CA). If surpassed convergence not yet met.
+adapt_delta;0.95;Stan param for MCMC (see http://mc-stan.org/users/)
+max_treedepth;10;Stan param for MCMC (see http://mc-stan.org/users/)
+svm.type;C-classification;svm used as a classification machine
+continuous_univariate_alpha;(1,0,100);degrees of freedom, mean and standard deviation of the intercept prior in continuous univariate model
+continuous_univariate_beta;(1,0,10);degrees of freedom, mean and standard deviation of the slope prior in continuous univariate model
+continuous_univariate_nu;(2,0.1);shape and rate of the degrees of freedom prior in continuous univariate model
+continuous_hierarchical_mu_alpha;(1,0,100);degrees of freedom, mean and standard deviation of the hierarchical intercept prior in continuous hierarchical model
+continuous_hierarchical_mu_beta;(1,0,10);degrees of freedom, mean and standard deviation of the hierarchical slope prior in continuous hierarchical model
+continuous_hierarchical_nu;(2,0.1);shape and rate of the degrees of freedom prior in continuous hierarchical model
+continuous_hierarchical_nu_alpha;(2,0.1);shape and rate of the degrees of freedom of the hierarchical intercept prior in continuous hierarchical model
+continuous_hierarchical_nu_beta;(2,0.1);shape and rate of the degrees of freedom of the hierarchical slope prior in continuous hierarchical model
+dichotomous_univariate_alpha;(1,0,100);degrees of freedom, mean and standard deviation of the intercept prior in dichotomous univariate model
+dichotomous_univariate_beta;(1,0,10);degrees of freedom, mean and standard deviation of the slope prior in dichotomous univariate model
+dichotomous_hierarchical_mu_alpha;(1,0,100);degrees of freedom, mean and standard deviation of the hierarchical intercept prior in dichotomous hierarchical model
+dichotomous_hierarchical_mu_beta;(1,0,10);degrees of freedom, mean and standard deviation of the hierarchical slope prior in dichotomous hierarchical model
+dichotomous_hierarchical_nu_alpha;(2,0.1);shape and rate of the degrees of freedom of the hierarchical intercept prior in dichotomous hierarchical model
+dichotomous_hierarchical_nu_beta;(2,0.1);shape and rate of the degrees of freedom of the hierarchical slope prior in dichotomous hierarchical model
