@@ -1,17 +1,12 @@
 %\VignetteIndexEntry{genphen overview}
-
 \documentclass[a4paper, 11pt]{article}
 \usepackage[utf8]{inputenc}
 \let\chapter\section
 \usepackage{libertine}
-% \usepackage[lined]{algorithm2e}
-
 \usepackage[numbers]{natbib}
 \bibliographystyle{plainnat}
-
 \usepackage[english]{babel}
 \selectlanguage{english}
-
 \usepackage{graphicx}
 \usepackage{placeins}
 \usepackage{amsmath}
@@ -19,9 +14,7 @@
 \usepackage{ifthen}
 \usepackage{float}
 \usepackage{subfig}
-
 \usepackage{lscape}
-
 \usepackage{parskip}
 \usepackage{multirow}
 \usepackage{todonotes}
@@ -29,26 +22,12 @@
 \usepackage{colortbl}
 \definecolor{hellgrau}{rgb}{0.9,0.9,0.9}
 \definecolor{dunkelgrau}{rgb}{0.8,0.8,0.8}
-
 \usepackage{hyperref}
-% remove ref boxes
-%\usepackage[hidelinks]{hyperref}
-
 %add-on renews
 \renewcommand\topfraction{0.85}
 \renewcommand\bottomfraction{0.85}
 \renewcommand\textfraction{0.1}
 \renewcommand\floatpagefraction{0.85}
-
-%confusion matrix
-\newcommand\confusion[1]{
-\fbox{\lower0.75cm
-\vbox to 0.5cm{\vfil
-\hbox to 0.5cm{\hfil\parbox{1cm}{#1}}
-\vfil}%
-}%
-}
-
 \setlength\floatsep{1.25\baselineskip plus 3pt minus 2pt}
 \setlength\textfloatsep{1.25\baselineskip plus 3pt minus 2pt}
 \setlength\intextsep{1.25\baselineskip plus 3pt minus 2 pt}
@@ -56,8 +35,6 @@
 
 \begin{document}
 \SweaveOpts{concordance=TRUE}
-
-
 
 \title{Decoding genotype-phenotype associations with \texttt{genphen}}
 \author{Simo Kitanovski, Daniel Hoffmann,\\
@@ -388,7 +365,7 @@ data(phenotype.saap)
 
 \paragraph{Genotype-phenotype data}
 First we show an overview of the distribution of the phenotype across the 
-genetic states found at each of the 9 studied positions in the multiple 
+genetic states found at each of the 8 studied positions in the multiple 
 sequence alignment.
 
 \begin{scriptsize}
@@ -441,7 +418,7 @@ Next, we perform the genetic association study for \underline{continuous}
 phenotypes with \texttt{genphen} using the following settings:
 \begin{itemize}
 \item \underline{hierarchical} Bayesian model will be run with \underline{2 MCMC 
-chains} composed of \underline{1500 iterations} each, including \underline{500 
+chains} composed of \underline{1,500 iterations} each, including \underline{500 
 warmup iterations}. 
 \item \underline{Random forest} was selected as for the statistical learning, 
 which will be run in a cross-validation mode with \underline{200 iterations}. 
