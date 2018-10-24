@@ -367,7 +367,7 @@ require(genphen)
 require(ggplot2)
 require(knitr)
 require(ggrepel)
-require(reshape2)
+require(reshape)
 require(ape)
 require(xtable)
 options(xtable.floating = FALSE)
@@ -398,7 +398,7 @@ sequence alignment.
 df <- data.frame(genotype.saap[, 80:86], 
                  phenotype = phenotype.saap,
                  stringsAsFactors = FALSE)
-df <- melt(data = df, id.vars = "phenotype")
+df <- reshape::melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
 df$site <- gsub(pattern = "X", replacement = '', x = df$site)
 df$site <- factor(x = df$site, levels = unique(df$site))
@@ -801,7 +801,7 @@ dichotomous.phenotype.snp <- c(rbinom(n = 20, size = 1, prob = 0.25),
 df <- data.frame(genotype.snp,
                  phenotype = dichotomous.phenotype.snp,
                  stringsAsFactors = FALSE)
-df <- melt(data = df, id.vars = "phenotype")
+df <- reshape::melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
 @
 
