@@ -1530,7 +1530,7 @@ runContH <- function(genphen.data,
                             n0 = general.data$n0,
                             hdi.level = hdi.level, 
                             rpa.iterations = rpa.iterations,
-                            model.stan = rpa.model.stan,
+                            model.stan = model.stan,
                             mcmc.iterations = mcmc.iterations,
                             mcmc.warmup = mcmc.warmup,
                             mcmc.chains = mcmc.chains,
@@ -1639,7 +1639,7 @@ runContH <- function(genphen.data,
   # special case for RPA, compile univariate stan model
   if(rpa.iterations > 0) {
     cat("======== Compiling RPA Model ======== \n")
-    rpa.model.stan <- compileModel(phenotype.type = "continuous", 
+    model.stan <- compileModel(phenotype.type = "continuous", 
                                    model.type = "univariate")
   }
   
@@ -1859,7 +1859,7 @@ runDichU <- function(genphen.data,
                           n0 = general.data$n0,
                           hdi.level = hdi.level, 
                           rpa.iterations = rpa.iterations,
-                          model.stan = rpa.model.stan,
+                          model.stan = model.stan,
                           mcmc.iterations = mcmc.iterations,
                           mcmc.warmup = mcmc.warmup,
                           mcmc.chains = mcmc.chains,
@@ -1984,7 +1984,7 @@ runDichH <- function(genphen.data,
                             n0 = general.data$n0,
                             hdi.level = hdi.level, 
                             rpa.iterations = rpa.iterations,
-                            model.stan = rpa.model.stan,
+                            model.stan = model.stan,
                             mcmc.iterations = mcmc.iterations,
                             mcmc.warmup = mcmc.warmup,
                             mcmc.chains = mcmc.chains,
@@ -2094,7 +2094,7 @@ runDichH <- function(genphen.data,
   # special case for RPA, compile univariate stan model
   if(rpa.iterations > 0) {
     cat("======== Compiling RPA Model ======== \n")
-    rpa.model.stan <- compileModel(phenotype.type = "dichotomous", 
+    model.stan <- compileModel(phenotype.type = "dichotomous", 
                                    model.type = "univariate")
   }
   

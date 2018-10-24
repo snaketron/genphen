@@ -25,9 +25,9 @@ association scores using Bayesian inference and statistical learning.
 
 \usage{
 runGenphen(genotype, phenotype, phenotype.type, model.type,
-           mcmc.chains, mcmc.iterations, mcmc.warmup,
-           cores, hdi.level, stat.learn.method,
-           cv.iterations, rpa.iterations, with.stan.obj)
+           mcmc.chains, mcmc.iterations, mcmc.warmup, cores, 
+           hdi.level, stat.learn.method, cv.iterations, 
+           rpa.iterations, with.stan.obj, ...)
 }
 
 
@@ -55,13 +55,11 @@ learning select 'none'.}
 to be computed. If rpa.iterations = 0, no RPA will be performed.}
 \item{with.stan.obj}{Logical indicator specifying whether the used stan objects
 should be returrned (default = FALSE, the stan objects can be large).}
-\item{optional: adapt_delta}{STAN configuration (default = 0.9).}
-\item{optional: max_treedepth}{STAN configuration (default = 10).}
-\item{optional: ntree}{Number of random forest trees to grow, only in case 
-stat.learn.method = 'rf' (default = 1000).}
-\item{optional: cv.fold}{Cross-validation fold (default = 0.66).}
-\item{optional: rpa.significant}{Perform RPA only if the estimated main effect 
-is significant (default = TRUE).}
+\item{...}{Optional parameters include adapt_delta: STAN configuration 
+(default = 0.9); max_treedepth: STAN configuration (default = 10); ntree: Number 
+of random forest trees to grow, only in case stat.learn.method = 'rf' (default 
+= 1000); cv.fold: Cross-validation fold (default = 0.66); rpa.significant: 
+Perform RPA only if the estimated main effect is significant (default = TRUE).}
 }
 
 
