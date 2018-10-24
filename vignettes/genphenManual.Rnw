@@ -398,7 +398,7 @@ sequence alignment.
 df <- data.frame(genotype.saap[, 82:89], 
                  phenotype = phenotype.saap,
                  stringsAsFactors = FALSE)
-df <- reshape::melt(data = df, id.vars = "phenotype")
+df <- melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
 df$site <- gsub(pattern = "X", replacement = '', x = df$site)
 df$site <- factor(x = df$site, levels = unique(df$site))
@@ -803,7 +803,7 @@ dichotomous.phenotype.snp <- c(rbinom(n = 20, size = 1, prob = 0.25),
 df <- data.frame(genotype.snp,
                  phenotype = dichotomous.phenotype.snp,
                  stringsAsFactors = FALSE)
-df <- reshape::melt(data = df, id.vars = "phenotype")
+df <- melt(data = df, id.vars = "phenotype")
 colnames(df) <- c("phenotype", "site", "genotype")
 @
 

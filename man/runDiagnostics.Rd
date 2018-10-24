@@ -25,7 +25,7 @@ SNPs deemed to be clearly non-informative.
 \usage{
 runDiagnostics(genotype, phenotype, phenotype.type, rf.trees,
                mcmc.chains, mcmc.iterations, mcmc.warmup,
-               cores, hdi.level, diagnostic.points)
+               cores, hdi.level, diagnostic.points, ...)
 }
 
 \arguments{
@@ -46,6 +46,8 @@ parameter is for multicore execution of the statistical learning procedures.}
 \item{hdi.level}{Highest density interval (HDI) (default = 0.95).}
 \item{diagnostic.points}{Vector of ranks (based on the importance measure) at 
 which to select the genotypes, for which the diagnostics will be run.}
+\item{...}{Optional parameters include adapt_delta: STAN configuration 
+(default = 0.9); max_treedepth: STAN configuration (default = 10).}
 }
 
 

@@ -1,0 +1,66 @@
+language: r
+
+r:
+  - release
+
+sudo: required
+cache: packages
+
+env:
+ global:
+   - CRAN: http://cran.rstudio.com
+
+warnings_are_errors: false
+latex: true
+pandoc: true
+
+
+r_packages:
+  - Rcpp
+  - e1071
+  - ggplot2
+  - rstan
+  - ggrepel
+  - knitr
+  - stats
+  - graphics
+  - ranger
+  - parallel
+  - foreach
+  - doParallel
+  - reshape2
+  - ape
+  - xtable
+
+bioc_packages:
+  - Biostrings
+
+
+addons:
+  apt:
+    packages:
+      - r-cran-digest
+
+addons:
+      apt:
+        sources: [ 'ubuntu-toolchain-r-test']
+        packages: ['libstdc++6']
+
+
+install: travis_wait 30 mvn install
+
+# r packages directly installed from github
+# r_github_pages:
+
+# before_install:
+
+# after_success:
+
+# notifications:
+#  email: false
+
+
+#before_install:
+#  - sudo add-apt-repository ppa:marutter/rrutter -y
+#  - sudo apt-get update
+#  - sudo apt-get install r-cran-rjags

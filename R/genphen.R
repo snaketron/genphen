@@ -2,10 +2,10 @@
 
 
 
-runGenphen <- function(genotype = NULL,
-                       phenotype = NULL,
-                       phenotype.type = NULL,
-                       model.type = NULL,
+runGenphen <- function(genotype,
+                       phenotype,
+                       phenotype.type,
+                       model.type,
                        mcmc.chains = 2,
                        mcmc.iterations = 2500,
                        mcmc.warmup = 500,
@@ -17,6 +17,8 @@ runGenphen <- function(genotype = NULL,
                        with.stan.obj = FALSE,
                        ...) {
   
+  # set standard C++14 
+  Sys.setenv(USE_CXX14 = 1)
   
   # check optional (dot) inputs
   dot.param <- checkDotParameters(...)
@@ -267,16 +269,16 @@ runGenphen <- function(genotype = NULL,
 
 
 
-runDiagnostics <- function(genotype = NULL,
-                           phenotype = NULL,
-                           phenotype.type = NULL,
+runDiagnostics <- function(genotype,
+                           phenotype,
+                           phenotype.type,
                            rf.trees = 5000,
                            mcmc.chains = 2,
                            mcmc.iterations = 2500,
                            mcmc.warmup = 500,
                            cores = 1,
                            hdi.level = 0.95,
-                           diagnostic.points = NULL,
+                           diagnostic.points,
                            ...) {
   
   
@@ -480,8 +482,8 @@ runDiagnostics <- function(genotype = NULL,
 
 
 
-runPhyloBiasCheck <- function(input.kinship.matrix = NULL,
-                              genotype = NULL) {
+runPhyloBiasCheck <- function(input.kinship.matrix,
+                              genotype) {
   
   # check params
   checkInputPhyloBias(input.kinship.matrix = input.kinship.matrix,
