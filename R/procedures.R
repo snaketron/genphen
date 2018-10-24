@@ -1,11 +1,11 @@
 
 
 
-
-
 # Description:
 # Get genotype-phenotype data in a multicore fashion
-getGenphenData <- function(genotype, phenotype, cores) {
+getGenphenData <- function(genotype, 
+                           phenotype, 
+                           cores) {
   
   
   # set site id
@@ -15,8 +15,8 @@ getGenphenData <- function(genotype, phenotype, cores) {
   # Description:
   # Get genotype-phenotype data
   getData <- function(genotype, phenotype) {
-    # MIN.OBS <- 3
-    MIN.OBS <- 1
+    # min.obs <- 3
+    min.obs <- 1
     
     sites <- colnames(genotype)
     snp.counter <- 1
@@ -38,7 +38,7 @@ getGenphenData <- function(genotype, phenotype, cores) {
             # 0
             hit.k <- which(genotype[, i] == gs[k])
             
-            if(length(hit.j) >= MIN.OBS & length(hit.k) >= MIN.OBS) {
+            if(length(hit.j) >= min.obs & length(hit.k) >= min.obs) {
               # create rows
               row.j <- data.frame(X = rep(x = 1, length = length(hit.j)),
                                   J = snp.counter, S = sites[i],
@@ -118,14 +118,11 @@ getGenphenData <- function(genotype, phenotype, cores) {
 
 
 
-
-
-
 # Description:
 # Get genotype summary
 getGenSummary <- function(genotype) {
-  # MIN.OBS <- 3
-  MIN.OBS <- 1
+  # min.obs <- 3
+  min.obs <- 1
   
   snp.counter <- 1
   gen.data <- NULL
@@ -147,7 +144,7 @@ getGenSummary <- function(genotype) {
                             n0 = sum(genotype[, i] == gs[k]),
                             stringsAsFactors = FALSE)
           
-          if(row$n1 >= MIN.OBS & row$n0 >= MIN.OBS) {
+          if(row$n1 >= min.obs & row$n0 >= min.obs) {
             # gen data
             gen.data <- rbind(gen.data, row)
             snp.counter <- snp.counter + 1
@@ -169,15 +166,149 @@ getGenSummary <- function(genotype) {
 
 
 
+# Description:
+# Check the optional (...) parameters, if provided.
+checkDotParameters <- function(...) {
+  
+  checkRpaSignificant <- function(rpa.significant) {
+    if(length(rpa.significant) != 1) {
+      stop("rpa.significant must be logical (TRUE/FALSE).")
+    }
+    
+    if(is.logical(rpa.significant) == FALSE) {
+      stop("rpa.significant must be logical.")
+    }
+  }
+  
+  checkAdaptDelta <- function(adapt_delta) {
+    if(length(adapt_delta) != 1) {
+      stop("adapt_delta must be in range (0, 1) (default = 0.8).")
+    }
+    
+    if(is.numeric(adapt_delta) == FALSE) {
+      stop("adapt_delta must be in range (0, 1)")
+    }
+    
+    if(adapt_delta >= 1 | adapt_delta <= 0) {
+      stop("adapt_delta must be in range (0, 1)")
+    }
+  }
+  
+  checkMaxTreedepth <- function(max_treedepth) {
+    if(length(max_treedepth) != 1) {
+      stop("max_treedepth is numeric parameter.")
+    }
+    
+    if(is.numeric(max_treedepth) == FALSE) {
+      stop("max_treedepth is numeric parameter.")
+    }
+    
+    if(max_treedepth < 5) {
+      stop("max_treedepth >= 5 (default = 10).")
+    }
+  }
+  
+  checkCvFold <- function(cv.fold) {
+    if(length(cv.fold) != 1) {
+      stop("cv.fold must be in range (0, 1) (default = 0.66).")
+    }
+    
+    if(is.numeric(cv.fold) == FALSE) {
+      stop("cv.fold must be in range (0, 1)")
+    }
+    
+    if(cv.fold >= 1 | cv.fold <= 0) {
+      stop("cv.fold must be in range (0, 1)")
+    }
+  }
+  
+  checkNtree <- function(ntree) {
+    if(length(ntree) != 1) {
+      stop("ntree is numeric parameter.")
+    }
+    
+    if(is.numeric(ntree) == FALSE) {
+      stop("ntree is numeric parameter.")
+    }
+    
+    if(ntree < 100) {
+      stop("ntree >= 100 (default = 500).")
+    }
+  }
+  
+  
+  available.names <- c("adapt_delta", 
+                       "max_treedepth", 
+                       "ntree", 
+                       "cv.fold", 
+                       "rpa.significant")
+  default.values <- list(adapt_delta = 0.9, 
+                         max_treedepth = 10,
+                         ntree = 1000, 
+                         cv.fold = 0.66, 
+                         rpa.significant = TRUE)
+  
+  # get the optional parameters
+  dot.names <- names(list(...))
+  
+  if(length(dot.names) > 0) {
+    if(any(dot.names %in% available.names) == FALSE) {
+      wrong.names <- dot.names[!dot.names %in% available.names]
+      stop(paste("Unknown optional parameter were provided! The following 
+                 optional parameters are available:", dot.names, sep = ' '))
+    }
+  }
+  
+  # check each parameter
+  for(p in dot.names) {
+    if(is.null(list(...)[[p]]) || is.na(list(...)[[p]])) {
+      stop(paste("optional parameter ", p, " can't be NULL", sep = ''))
+    }
+    if(p == "adapt_delta") {
+      checkAdaptDelta(adapt_delta = list(...)[[p]])
+      default.values[["adapt_delta"]] <- list(...)[[p]]
+    }
+    if(p == "rpa.significant") {
+      checkRpaSignificant(rpa.significant = list(...)[[p]])
+      default.values[["rpa.significant"]] <- list(...)[[p]]
+    }
+    if(p == "max_treedepth") {
+      checkMaxTreedepth(max_treedepth = list(...)[[p]])
+      default.values[["max_treedepth"]] <- list(...)[[p]]
+    }
+    if(p == "cv.fold") {
+      checkCvFold(cv.fold = list(...)[[p]])
+      default.values[["cv.fold"]] <- list(...)[[p]]
+    }
+    if(p == "ntree") {
+      checkNtree(ntree = list(...)[[p]])
+      default.values[["ntree"]] <- list(...)[[p]]
+    }
+  }
+  
+  return (default.values)
+}
+
+
+
 
 
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInput <- function(genotype, phenotype, phenotype.type, model.type,
-                       mcmc.chains, mcmc.iterations, mcmc.warmup, cores, 
-                       hdi.level, stat.learn.method, cv.iterations, 
-                       rpa.iterations, with.stan.obj) {
+checkInput <- function(genotype, 
+                       phenotype, 
+                       phenotype.type, 
+                       model.type,
+                       mcmc.chains, 
+                       mcmc.iterations, 
+                       mcmc.warmup, 
+                       cores, 
+                       hdi.level, 
+                       stat.learn.method, 
+                       cv.iterations, 
+                       rpa.iterations, 
+                       with.stan.obj) {
   
   checkGenotypePhenotype <- function(genotype, phenotype) {
     # CHECK: genotype
@@ -193,8 +324,8 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
           stop("the genotypes cannot have less than two observations the or
                number of genotypes cannot be 0.")
         }
-        }
       }
+    }
     else {
       if(is.vector(genotype)) {
         genotype <- matrix(data = genotype, ncol = 1)
@@ -214,7 +345,7 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
         stop("if it is structured in matrix/data.frame the genotype must
              be of character type.")
       }
-      }
+    }
     
     # CHECK: phenotype
     if(!is.vector(phenotype)) {
@@ -233,7 +364,7 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
     if(nrow(genotype) != length(phenotype)) {
       stop("length(genotype)!=length(phenotype), they must be equal in length.")
     }
-      }
+  }
   
   checkPhenotypeValidity <- function(phenotype, phenotype.type) {
     if(phenotype.type == "dichotomous") {
@@ -241,15 +372,15 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
         stop("The dichotomous phenotype must be a vector with exactly two
              categories (classes) \n")
       }
-      }
+    }
     
     if(phenotype.type == "continuous") {
       if(length(unique(phenotype)) <= 2) {
         warning("The continuous phenotype has less then 3 unique elements,
                 are you sure this is a continuous vector? \n")
       }
-      }
     }
+  }
   
   checkPhenotypeType <- function(phenotype.type) {
     # CHECK: phenotype.type
@@ -439,7 +570,7 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
   checkCv(stat.learn.method = stat.learn.method, cv.iterations = cv.iterations)
   checkRpa(rpa.iterations = rpa.iterations)
   checkStanObj(with.stan.obj = with.stan.obj)
-    }
+}
 
 
 
@@ -448,7 +579,9 @@ checkInput <- function(genotype, phenotype, phenotype.type, model.type,
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInputDiagnostics <- function(genotype, diagnostic.points, rf.trees){
+checkInputDiagnostics <- function(genotype, 
+                                  diagnostic.points, 
+                                  rf.trees){
   
   checkDiagnosticPoints <- function(diagnostic.points, rf.trees) {
     
@@ -495,7 +628,8 @@ checkInputDiagnostics <- function(genotype, diagnostic.points, rf.trees){
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
+checkInputPhyloBias <- function(input.kinship.matrix, 
+                                genotype) {
   
   
   checkGenotype <- function(genotype) {
@@ -511,8 +645,8 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
           stop("the genotypes cannot have less than two observations the or
                number of genotypes cannot be 0.")
         }
-        }
       }
+    }
     else {
       if(is.vector(genotype)) {
         genotype <- matrix(data = genotype, ncol = 1)
@@ -532,8 +666,8 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
         stop("if it is structured in matrix/data.frame the genotype must
              be of character type.")
       }
-      }
-      }
+    }
+  }
   
   
   checkKinship <- function(input.kinship.matrix) {
@@ -570,7 +704,7 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
     checkKinship(input.kinship.matrix = input.kinship.matrix)
   }
   checkGenotype(genotype = genotype)
-    }
+}
 
 
 
@@ -583,12 +717,14 @@ checkInputPhyloBias <- function(input.kinship.matrix, genotype) {
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
 # The classification is computed using random forest.
-getRfCa <- function(genphen.data, cv.fold, 
-                    cv.steps, hdi.level, 
+getRfCa <- function(genphen.data, 
+                    cv.fold, 
+                    cv.steps, 
+                    hdi.level, 
                     ntree) {
-
   
-    
+  
+  
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence
   # is met before the number of steps is hit.
@@ -777,8 +913,8 @@ getRfCa <- function(genphen.data, cv.fold,
   Y <- genphen.data$X
   
   
-  MIN.OBS <- 3
-  if(length(unique(X)) < 2 | all(table(Y) < MIN.OBS)) {
+  min.obs <- 3
+  if(length(unique(X)) < 2 | all(table(Y) < min.obs)) {
     # pack dummy output, as at least a two-category predictor is needed
     # to run the incremental learning procedure
     class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, 
@@ -825,8 +961,10 @@ getRfCa <- function(genphen.data, cv.fold,
 # (phenotype), compute the classification accuracy of classifying
 # the genotype from the phenotype alone (and corresponding HDI).
 # The classification is computed using support vector machines.
-getSvmCa <- function(genphen.data, cv.fold, 
-                     cv.steps, hdi.level) {
+getSvmCa <- function(genphen.data, 
+                     cv.fold, 
+                     cv.steps, 
+                     hdi.level) {
   
   
   # Description:
@@ -1003,8 +1141,8 @@ getSvmCa <- function(genphen.data, cv.fold,
   X <- genphen.data$Y
   Y <- genphen.data$X
   
-  MIN.OBS <- 3
-  if(length(unique(X)) < 2 | all(table(Y) < MIN.OBS)) {
+  min.obs <- 3
+  if(length(unique(X)) < 2 | all(table(Y) < min.obs)) {
     # pack dummy output, as at least a two-category predictor is needed
     # to run the incremental learning procedure
     class.obj <- list(ca = NA, ca.L = NA, ca.H = NA, kappa = NA, 
@@ -1088,9 +1226,16 @@ getNoneCa <- function(genphen.data) {
 
 # Description:
 # Bayesian univariate GLM with continuous outcome and a two-factor predictor.
-runContU <- function(genphen.data, mcmc.chains, mcmc.iterations, 
-                     mcmc.warmup, cores, hdi.level, model.stan, 
-                     rpa.iterations = 0, with.stan.obj = FALSE) {
+runContU <- function(genphen.data, 
+                     mcmc.chains, 
+                     mcmc.iterations, 
+                     mcmc.warmup, 
+                     cores, 
+                     hdi.level, 
+                     model.stan, 
+                     rpa.iterations, 
+                     with.stan.obj, 
+                     ...) {
   
   
   data.list <- list(X = genphen.data$X,
@@ -1102,6 +1247,8 @@ runContU <- function(genphen.data, mcmc.chains, mcmc.iterations,
   
   
   # get initial parameter values
+  control = list(adapt_delta = list(...)[["adapt_delta"]],
+                 max_treedepth = list(...)[["max_treedepth"]])
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                pars = c("alpha", "beta", "sigma", "nu"),
@@ -1109,8 +1256,7 @@ runContU <- function(genphen.data, mcmc.chains, mcmc.iterations,
                                warmup = mcmc.warmup,
                                chains = mcmc.chains,
                                cores = cores,
-                               control = list(adapt_delta = 0.95,
-                                              max_treedepth = 10),
+                               control = control,
                                verbose = FALSE,
                                refresh = -1)
   
@@ -1212,9 +1358,25 @@ runContU <- function(genphen.data, mcmc.chains, mcmc.iterations,
                           nu.H = stats["nu", paste(hdi.H*100,"%",sep='')],
                           bc = bc)
   
-  
   # special case for RPA
   rpa.out <- NULL
+  if(list(...)[["rpa.significant"]] == TRUE) {
+    if((stats.out$beta.L <= 0 & stats.out$beta.H >= 0) == TRUE) {
+      rpa.iterations <- 0
+      rpa.out <- data.frame(site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            rpa.power.error = NA,
+                            rpa.sign.error = NA,
+                            rpa.beta.mean = NA,
+                            rpa.beta.sd = NA,
+                            rpa.N = NA,
+                            stringsAsFactors = FALSE)
+    }
+  }
+  
   if(rpa.iterations > 0) {
     rpa.out <- getRpaCont(posterior = posterior,
                           beta.mean = stats["beta", "mean"],
@@ -1228,7 +1390,9 @@ runContU <- function(genphen.data, mcmc.chains, mcmc.iterations,
                           model.stan = model.stan,
                           mcmc.iterations = mcmc.iterations,
                           mcmc.warmup = mcmc.warmup,
-                          mcmc.chains = mcmc.chains)
+                          mcmc.chains = mcmc.chains,
+                          adapt_delta = list(...)[["adapt_delta"]],
+                          max_treedepth = list(...)[["max_treedepth"]])
   }
   
   # return
@@ -1245,16 +1409,23 @@ runContU <- function(genphen.data, mcmc.chains, mcmc.iterations,
 
 # Description:
 # Bayesian hierarchical GLM with continuous outcome and a two-factor predictor.
-runContH <- function(genphen.data, mcmc.chains, mcmc.iterations, 
-                     mcmc.warmup, cores, hdi.level, model.stan,
-                     rpa.iterations, with.stan.obj) {
+runContH <- function(genphen.data, 
+                     mcmc.chains, 
+                     mcmc.iterations, 
+                     mcmc.warmup, 
+                     cores, 
+                     hdi.level, 
+                     model.stan,
+                     rpa.iterations, 
+                     with.stan.obj, 
+                     ...) {
   
   
   # Description:
   # Collection of results, ppc and rpa in case of hierarchical analysis
   getResults <- function(j, data.list, general.data, posterior, 
                          stats, hdi.level, mcmc.chains, mcmc.iterations, 
-                         mcmc.warmup, model.stan, rpa.iterations) {
+                         mcmc.warmup, model.stan, rpa.iterations, ...) {
     
     
     # ppc
@@ -1322,9 +1493,26 @@ runContH <- function(genphen.data, mcmc.chains, mcmc.iterations,
                             nu.H = stats[n.key, paste(hdi.H*100,"%",sep='')],
                             bc = bc)
     
-    
     # special case for RPA
     rpa.out <- NULL
+    if(list(...)[["rpa.significant"]] == TRUE) {
+      if((stats.out$beta.L <= 0 & stats.out$beta.H >= 0) == TRUE) {
+        rpa.iterations <- 0
+        rpa.out <- data.frame(site = general.data$site,
+                              g1 = general.data$g1,
+                              g0 = general.data$g0,
+                              n1 = general.data$n1,
+                              n0 = general.data$n0,
+                              rpa.power.error = NA,
+                              rpa.sign.error = NA,
+                              rpa.beta.mean = NA,
+                              rpa.beta.sd = NA,
+                              rpa.N = NA,
+                              stringsAsFactors = FALSE)
+      }
+    }
+    
+    
     if(rpa.iterations > 0) {
       # create a temporary posterior similar to the one in the univariate case
       a.key <- paste("alpha", j, sep = '.')
@@ -1345,9 +1533,10 @@ runContH <- function(genphen.data, mcmc.chains, mcmc.iterations,
                             model.stan = rpa.model.stan,
                             mcmc.iterations = mcmc.iterations,
                             mcmc.warmup = mcmc.warmup,
-                            mcmc.chains = mcmc.chains)
+                            mcmc.chains = mcmc.chains,
+                            adapt_delta = list(...)[["adapt_delta"]],
+                            max_treedepth = list(...)[["max_treedepth"]])
     }
-    
     
     # return
     return (list(statistics.out = stats.out,
@@ -1366,14 +1555,15 @@ runContH <- function(genphen.data, mcmc.chains, mcmc.iterations,
   
   
   # get initial parameter values
+  control = list(adapt_delta = list(...)[["adapt_delta"]],
+                 max_treedepth = list(...)[["max_treedepth"]])
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                iter = mcmc.iterations,
                                warmup = mcmc.warmup,
                                chains = mcmc.chains,
                                cores = cores,
-                               control = list(adapt_delta = 0.95,
-                                              max_treedepth = 10),
+                               control = control,
                                verbose = FALSE,
                                refresh = -1)
   
@@ -1473,7 +1663,10 @@ runContH <- function(genphen.data, mcmc.chains, mcmc.iterations,
                            mcmc.iterations = mcmc.iterations, 
                            mcmc.warmup = mcmc.warmup, 
                            model.stan = model.stan, 
-                           rpa.iterations = rpa.iterations))
+                           rpa.iterations = rpa.iterations,
+                           adapt_delta = list(...)[["adapt_delta"]],
+                           max_treedepth = list(...)[["max_treedepth"]],
+                           rpa.significant = list(...)[["rpa.significant"]]))
   # stop cluster
   parallel::stopCluster(cl = cl)
   doParallel::stopImplicitCluster()
@@ -1506,9 +1699,16 @@ runContH <- function(genphen.data, mcmc.chains, mcmc.iterations,
 
 # Description:
 # Bayesian GLM with dichotomous outcome and a two-factor predictor.
-runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations, 
-                     mcmc.warmup, cores, hdi.level, model.stan, 
-                     rpa.iterations, with.stan.obj) {
+runDichU <- function(genphen.data,
+                     mcmc.chains, 
+                     mcmc.iterations, 
+                     mcmc.warmup, 
+                     cores, 
+                     hdi.level, 
+                     model.stan, 
+                     rpa.iterations, 
+                     with.stan.obj, 
+                     ...) {
   
   
   genphen.data$N <- 1
@@ -1521,6 +1721,8 @@ runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations,
   
   
   # get initial parameter values
+  control = list(adapt_delta = list(...)[["adapt_delta"]],
+                 max_treedepth = list(...)[["max_treedepth"]])
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                pars = c("alpha", "beta"),
@@ -1528,8 +1730,7 @@ runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations,
                                warmup = mcmc.warmup,
                                chains = mcmc.chains,
                                cores = cores,
-                               control = list(adapt_delta = 0.95, 
-                                              max_treedepth = 10),
+                               control = control,
                                verbose = FALSE,
                                refresh = -1)
   
@@ -1630,21 +1831,42 @@ runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations,
   
   # special case for RPA
   rpa.out <- NULL
+  if(list(...)[["rpa.significant"]] == TRUE) {
+    if((stats.out$beta.L <= 0 & stats.out$beta.H >= 0) == TRUE) {
+      rpa.iterations <- 0
+      rpa.out <- data.frame(site = general.data$site,
+                            g1 = general.data$g1,
+                            g0 = general.data$g0,
+                            n1 = general.data$n1,
+                            n0 = general.data$n0,
+                            rpa.power.error = NA,
+                            rpa.sign.error = NA,
+                            rpa.beta.mean = NA,
+                            rpa.beta.sd = NA,
+                            rpa.N = NA,
+                            stringsAsFactors = FALSE)
+    }
+  }
+  
   if(rpa.iterations > 0) {
+    colnames(posterior) <- c("alpha", "beta")
     rpa.out <- getRpaDich(posterior = posterior,
-                          beta.mean = stats["beta", "mean"],
+                          beta.mean = mean(posterior$beta),
                           site = general.data$site,
+                          g1 = general.data$g1,
+                          g0 = general.data$g0,
                           n1 = general.data$n1,
                           n0 = general.data$n0,
-                          g1 = general.data$g1, 
-                          g0 = general.data$g0,
                           hdi.level = hdi.level, 
                           rpa.iterations = rpa.iterations,
-                          model.stan = model.stan,
+                          model.stan = rpa.model.stan,
                           mcmc.iterations = mcmc.iterations,
                           mcmc.warmup = mcmc.warmup,
-                          mcmc.chains = mcmc.chains)
+                          mcmc.chains = mcmc.chains,
+                          adapt_delta = list(...)[["adapt_delta"]],
+                          max_treedepth = list(...)[["max_treedepth"]])
   }
+  
   
   # return
   return (list(statistics.out = stats.out,
@@ -1660,16 +1882,23 @@ runDichU <- function(genphen.data, mcmc.chains, mcmc.iterations,
 
 # Description:
 # Bayesian GLM with dichotomous outcome and a two-factor predictor.
-runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations, 
-                     mcmc.warmup, cores, hdi.level, model.stan, 
-                     rpa.iterations, with.stan.obj) {
+runDichH <- function(genphen.data, 
+                     mcmc.chains, 
+                     mcmc.iterations, 
+                     mcmc.warmup, 
+                     cores, 
+                     hdi.level, 
+                     model.stan, 
+                     rpa.iterations, 
+                     with.stan.obj, 
+                     ...) {
   
   
   # Description:
   # Collection of results, ppc and rpa in case of hierarchical analysis
   getResults <- function(j, data.list, general.data, posterior, 
                          stats, hdi.level, mcmc.chains, mcmc.iterations, 
-                         mcmc.warmup, model.stan, rpa.iterations) {
+                         mcmc.warmup, model.stan, rpa.iterations, ...) {
     
     # ppc
     ppc.fun <- function(p, x, n) {
@@ -1727,6 +1956,23 @@ runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations,
     
     # special case for RPA
     rpa.out <- NULL
+    if(list(...)[["rpa.significant"]] == TRUE) {
+      if((stats.out$beta.L <= 0 & stats.out$beta.H >= 0) == TRUE) {
+        rpa.iterations <- 0
+        rpa.out <- data.frame(site = general.data$site,
+                              g1 = general.data$g1,
+                              g0 = general.data$g0,
+                              n1 = general.data$n1,
+                              n0 = general.data$n0,
+                              rpa.power.error = NA,
+                              rpa.sign.error = NA,
+                              rpa.beta.mean = NA,
+                              rpa.beta.sd = NA,
+                              rpa.N = NA,
+                              stringsAsFactors = FALSE)
+      }
+    }
+    
     if(rpa.iterations > 0) {
       colnames(posterior) <- c("alpha", "beta")
       rpa.out <- getRpaDich(posterior = posterior,
@@ -1741,7 +1987,9 @@ runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations,
                             model.stan = rpa.model.stan,
                             mcmc.iterations = mcmc.iterations,
                             mcmc.warmup = mcmc.warmup,
-                            mcmc.chains = mcmc.chains)
+                            mcmc.chains = mcmc.chains,
+                            adapt_delta = list(...)[["adapt_delta"]],
+                            max_treedepth = list(...)[["max_treedepth"]])
     }
     
     
@@ -1762,14 +2010,15 @@ runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations,
   
   
   # get initial parameter values
+  control = list(adapt_delta = list(...)[["adapt_delta"]],
+                 max_treedepth = list(...)[["max_treedepth"]])
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                iter = mcmc.iterations,
                                warmup = mcmc.warmup,
                                chains = mcmc.chains,
                                cores = cores,
-                               control = list(adapt_delta = 0.95, 
-                                              max_treedepth = 10),
+                               control = control,
                                verbose = FALSE,
                                refresh = -1)
   
@@ -1868,7 +2117,10 @@ runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations,
                            mcmc.iterations = mcmc.iterations,
                            mcmc.warmup = mcmc.warmup,
                            model.stan = model.stan,
-                           rpa.iterations = rpa.iterations))
+                           rpa.iterations = rpa.iterations,
+                           adapt_delta = list(...)[["adapt_delta"]],
+                           max_treedepth = list(...)[["max_treedepth"]],
+                           rpa.significant = list(...)[["rpa.significant"]]))
   # stop cluster
   parallel::stopCluster(cl = cl)
   doParallel::stopImplicitCluster()
@@ -1904,7 +2156,8 @@ runDichH <- function(genphen.data, mcmc.chains, mcmc.iterations,
 # Given a genotype dataset containing SNPs (columns) and N individuals (rows),
 # the procedure computes a NxN kinship matrix for the individuals and estimates
 # the phylogenetic bias related to each SNP.
-getPhyloBias <- function(genotype, k.matrix) {
+getPhyloBias <- function(genotype, 
+                         k.matrix) {
   phylo.bias <- c()
   
   # total mean phylogenetic distance
@@ -1932,18 +2185,31 @@ getPhyloBias <- function(genotype, k.matrix) {
 
 # Description:
 # RPA for continuous data
-getRpaCont <- function(posterior, beta.mean, site, g1, g0, n1, n0, 
-                       hdi.level, rpa.iterations, model.stan, 
-                       mcmc.iterations, mcmc.warmup, mcmc.chains) {
+getRpaCont <- function(posterior, 
+                       beta.mean, 
+                       site, 
+                       g1, 
+                       g0, 
+                       n1, 
+                       n0, 
+                       hdi.level, 
+                       rpa.iterations, 
+                       model.stan, 
+                       mcmc.iterations, 
+                       mcmc.warmup, 
+                       mcmc.chains,
+                       ...) {
   # ppc
   rpaRun <- function(p, n1, n0, model.stan, mcmc.iterations,
-                     mcmc.warmup, mcmc.chains, hdi.level) {
+                     mcmc.warmup, mcmc.chains, hdi.level, ...) {
     
     y1 <- p[1]+p[2]*1+p[3]*stats::rt(n = n1, df = p[4])
     y0 <- p[1]+p[2]*0+p[3]*stats::rt(n = n0, df = p[4])
     data.list <- list(X = rep(x = c(1, 0), times = c(n1, n0)),
                       Y = c(y1, y0), Z = n0+n1)
     
+    control <- list(adapt_delta = list(...)[["adapt_delta"]],
+                    max_treedepth = list(...)[["max_treedepth"]])
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta", "sigma", "nu"),
@@ -1951,8 +2217,7 @@ getRpaCont <- function(posterior, beta.mean, site, g1, g0, n1, n0,
                                      warmup = mcmc.warmup,
                                      chains = mcmc.chains,
                                      cores = 1,
-                                     control = list(adapt_delta = 0.95,
-                                                    max_treedepth = 10),
+                                     control = control,
                                      verbose = FALSE,
                                      refresh = -1)
     
@@ -1978,7 +2243,9 @@ getRpaCont <- function(posterior, beta.mean, site, g1, g0, n1, n0,
   rpa <- apply(X = posterior[, c("alpha", "beta", "sigma", "nu")], MARGIN = 1, 
                FUN = rpaRun, n1 = n1, n0 = n0, hdi.level = hdi.level, 
                model.stan = model.stan, mcmc.iterations = mcmc.iterations, 
-               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains)
+               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains,
+               adapt_delta = list(...)[["adapt_delta"]],
+               max_treedepth = list(...)[["max_treedepth"]])
   rpa <- do.call(rbind, rpa)
   
   
@@ -2027,17 +2294,31 @@ getRpaCont <- function(posterior, beta.mean, site, g1, g0, n1, n0,
 
 # Description:
 # RPA for dichotomous data
-getRpaDich <- function(posterior, beta.mean, site, g1, g0, n1, n0, 
-                       hdi.level, rpa.iterations, model.stan, 
-                       mcmc.iterations, mcmc.warmup, mcmc.chains) {
+getRpaDich <- function(posterior, 
+                       beta.mean, 
+                       site, 
+                       g1, 
+                       g0, 
+                       n1, 
+                       n0, 
+                       hdi.level, 
+                       rpa.iterations, 
+                       model.stan, 
+                       mcmc.iterations, 
+                       mcmc.warmup, 
+                       mcmc.chains,
+                       ...) {
   
   
   # ppc
   rpaRun <- function(p, n1, n0, model.stan, mcmc.iterations,
-                      mcmc.warmup, mcmc.chains, hdi.level) {
+                     mcmc.warmup, mcmc.chains, hdi.level, ...) {
     y1 <- stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*1))), size = n1)
     y0 <- stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*0))), size = n0)
     data.list <- list(X = c(1, 0), Y = c(y1, y0), N = c(n1, n0), Z = 2)
+    
+    control <- list(adapt_delta = list(...)[["adapt_delta"]],
+                    max_treedepth = list(...)[["max_treedepth"]])
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta"),
@@ -2045,8 +2326,7 @@ getRpaDich <- function(posterior, beta.mean, site, g1, g0, n1, n0,
                                      warmup = mcmc.warmup,
                                      chains = mcmc.chains,
                                      cores = 1,
-                                     control = list(adapt_delta = 0.95,
-                                                    max_treedepth = 10),
+                                     control = control,
                                      verbose = FALSE,
                                      refresh = -1)
     
@@ -2064,56 +2344,18 @@ getRpaDich <- function(posterior, beta.mean, site, g1, g0, n1, n0,
                       stringsAsFactors = FALSE))
   }
   
-  
-  # ppc
-  rpaRun3 <- function(p, n1, n0, model.stan, mcmc.iterations,
-                     mcmc.warmup, mcmc.chains, hdi.level) {
-    
-    # sim Y1
-    y1 <- stats::rnorm(n = 1, mean = p[1]+p[2]*1, sd = p[3])
-    y1 <- 1/(1+exp(-y1))
-    y1 <- stats::rbinom(n = 1, prob = y1, size = n1)
-    
-    # sim Y0
-    y0 <- stats::rnorm(n = 1, mean = p[1]+p[2]*0, sd = p[3])
-    y0 <- 1/(1+exp(-y0))
-    y0 <- stats::rbinom(n = 1, prob = y0, size = n0)
-    
-    data.list <- list(X = c(1, 0), Y = c(y1, y0), N = c(n1, n0), Z = 2)
-    ppc.posterior <- rstan::sampling(object = model.stan,
-                                     data = data.list,
-                                     pars = c("alpha", "beta"),
-                                     iter = mcmc.iterations,
-                                     warmup = mcmc.warmup,
-                                     chains = mcmc.chains,
-                                     cores = 1,
-                                     control = list(adapt_delta = 0.95,
-                                                    max_treedepth = 10),
-                                     verbose = FALSE,
-                                     refresh = -1)
-    
-    # compute posterior summary
-    hdi.L <- (1-hdi.level)/2
-    hdi.H <- 1-(1-hdi.level)/2
-    stats <- rstan::summary(object = ppc.posterior, 
-                            pars = c("alpha", "beta"), 
-                            prob = c(hdi.L, hdi.H))$summary
-    
-    # return
-    return(data.frame(beta.mean = stats["beta", "mean"],
-                      beta.L = stats["beta", paste(hdi.L*100,"%",sep='')],
-                      beta.H = stats["beta", paste(hdi.H*100,"%",sep='')],
-                      stringsAsFactors = FALSE))
-  }
   
   # get subset of posterior
   rpa.i <- sample(x = 1:nrow(posterior), size = rpa.iterations, replace = TRUE)
   posterior <- posterior[rpa.i, ]
   
+  
   rpa <- apply(X = posterior[, c("alpha", "beta")], MARGIN = 1, 
                FUN = rpaRun, n1 = n1, n0 = n0, hdi.level = hdi.level, 
                model.stan = model.stan, mcmc.iterations = mcmc.iterations, 
-               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains)
+               mcmc.warmup = mcmc.warmup, mcmc.chains = mcmc.chains,
+               adapt_delta = list(...)[["adapt_delta"]],
+               max_treedepth = list(...)[["max_treedepth"]])
   rpa <- do.call(rbind, rpa)
   rpa$site <- site
   rpa$g1 <- g1

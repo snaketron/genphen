@@ -55,7 +55,17 @@ learning select 'none'.}
 to be computed. If rpa.iterations = 0, no RPA will be performed.}
 \item{with.stan.obj}{Logical indicator specifying whether the used stan objects
 should be returrned (default = FALSE, the stan objects can be large).}
+\item{optional: adapt_delta}{STAN configuration (default = 0.9).}
+\item{optional: max_treedepth}{STAN configuration (default = 10).}
+\item{optional: ntree}{Number of random forest trees to grow, only in case 
+stat.learn.method = 'rf' (default = 1000).}
+\item{optional: cv.fold}{Cross-validation fold (default = 0.66).}
+\item{optional: rpa.significant}{Perform RPA only if the estimated main effect 
+is significant (default = TRUE).}
 }
+
+
+
 
 
 

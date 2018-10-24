@@ -14,7 +14,12 @@ runGenphen <- function(genotype = NULL,
                        stat.learn.method = "rf",
                        cv.iterations = 1000,
                        rpa.iterations = 0,
-                       with.stan.obj = FALSE) {
+                       with.stan.obj = FALSE,
+                       ...) {
+  
+  
+  # check optional (dot) inputs
+  dot.param <- checkDotParameters(...)
   
   
   # check inputs
@@ -85,7 +90,10 @@ runGenphen <- function(genotype = NULL,
                              hdi.level = hdi.level,
                              model.stan = model.stan,
                              rpa.iterations = rpa.iterations,
-                             with.stan.obj = with.stan.obj))
+                             with.stan.obj = with.stan.obj,
+                             adapt_delta = dot.param$adapt_delta,
+                             max_treedepth = dot.param$max_treedepth,
+                             rpa.significant = dot.param$rpa.significant))
     }
     else if(phenotype.type == "dichotomous") {
       o <- (foreach(j = 1:max(genphen.data$J),
@@ -100,7 +108,10 @@ runGenphen <- function(genotype = NULL,
                              hdi.level = hdi.level,
                              model.stan = model.stan,
                              rpa.iterations = rpa.iterations,
-                             with.stan.obj = with.stan.obj))
+                             with.stan.obj = with.stan.obj,
+                             adapt_delta = dot.param$adapt_delta,
+                             max_treedepth = dot.param$max_treedepth,
+                             rpa.significant = dot.param$rpa.significant))
     }
     # stop cluster
     parallel::stopCluster(cl = cl)
@@ -118,7 +129,10 @@ runGenphen <- function(genotype = NULL,
                     hdi.level = hdi.level,
                     model.stan = model.stan,
                     rpa.iterations = rpa.iterations,
-                    with.stan.obj = with.stan.obj)
+                    with.stan.obj = with.stan.obj,
+                    adapt_delta = dot.param$adapt_delta,
+                    max_treedepth = dot.param$max_treedepth,
+                    rpa.significant = dot.param$rpa.significant)
     }
     else if(phenotype.type == "dichotomous") {
       o <- runDichH(genphen.data = genphen.data,
@@ -129,7 +143,10 @@ runGenphen <- function(genotype = NULL,
                     hdi.level = hdi.level,
                     model.stan = model.stan,
                     rpa.iterations = rpa.iterations,
-                    with.stan.obj = with.stan.obj)
+                    with.stan.obj = with.stan.obj,
+                    adapt_delta = dot.param$adapt_delta,
+                    max_treedepth = dot.param$max_treedepth,
+                    rpa.significant = dot.param$rpa.significant)
     }
   }
   
@@ -149,17 +166,17 @@ runGenphen <- function(genotype = NULL,
                     .export = c("getRfCa", "getHdi", "getKappa"),
                     .packages = c("ranger")) %dopar%
               getRfCa(genphen.data = genphen.data[genphen.data$J == j, ],
-                      cv.fold = 0.66,
+                      cv.fold = dot.param[["cv.fold"]],
                       cv.steps = cv.iterations,
                       hdi.level = hdi.level,
-                      ntree = 1000))
+                      ntree = dot.param[["ntree"]]))
   }
   else if(stat.learn.method == "svm") {
     cas <- (foreach(j = 1:max(genphen.data$J),
                     .export = c("getSvmCa", "getHdi", "getKappa"), 
                     .packages = c("e1071")) %dopar% 
               getSvmCa(genphen.data = genphen.data[genphen.data$J == j, ],
-                       cv.fold = 0.66,
+                       cv.fold = dot.param[["cv.fold"]],
                        cv.steps = cv.iterations,
                        hdi.level = hdi.level))
   }
@@ -259,7 +276,8 @@ runDiagnostics <- function(genotype = NULL,
                            mcmc.warmup = 500,
                            cores = 1,
                            hdi.level = 0.95,
-                           diagnostic.points = NULL) {
+                           diagnostic.points = NULL,
+                           ...) {
   
   
   # check inputs
@@ -276,6 +294,10 @@ runDiagnostics <- function(genotype = NULL,
              cv.iterations = 0,
              rpa.iterations = 0,
              with.stan.obj = FALSE)
+  
+  
+  # check optional (dot) inputs
+  dot.param <- checkDotParameters(...)
   
   
   # convert AAMultipleAlignment to matrix if needed
@@ -377,6 +399,7 @@ runDiagnostics <- function(genotype = NULL,
   doParallel::registerDoParallel(cl)
   Js <- unique(genphen.data$J)
   j <- NULL
+  
   if(phenotype.type == "continuous") {
     o <- (foreach(j = 1:length(Js),
                   .export = c("runContU", "getHdi", "getGenphenData",
@@ -389,7 +412,11 @@ runDiagnostics <- function(genotype = NULL,
                            cores = 1,
                            hdi.level = hdi.level,
                            model.stan = model.stan,
-                           rpa.iterations = 0))
+                           rpa.iterations = 0,
+                           with.stan.obj = FALSE,
+                           adapt_delta = dot.param$adapt_delta,
+                           max_treedepth = dot.param$max_treedepth,
+                           rpa.significant = dot.param$rpa.significant))
   }
   else if(phenotype.type == "dichotomous") {
     o <- (foreach(j = 1:length(Js),
@@ -403,7 +430,11 @@ runDiagnostics <- function(genotype = NULL,
                            cores = 1,
                            hdi.level = hdi.level,
                            model.stan = model.stan,
-                           rpa.iterations = 0))
+                           rpa.iterations = 0,
+                           with.stan.obj = FALSE,
+                           adapt_delta = dot.param$adapt_delta,
+                           max_treedepth = dot.param$max_treedepth,
+                           rpa.significant = dot.param$rpa.significant))
   }
   # stop cluster
   parallel::stopCluster(cl = cl)
