@@ -17,9 +17,6 @@ runGenphen <- function(genotype,
                        with.stan.obj = FALSE,
                        ...) {
   
-  # set standard C++14 
-  Sys.setenv(USE_CXX14 = 1)
-  
   # check optional (dot) inputs
   dot.param <- checkDotParameters(...)
   

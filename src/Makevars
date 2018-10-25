@@ -1,0 +1,2 @@
+CXX14 = g++ # or clang++ if you have that
+CXX14FLAGS = -O3

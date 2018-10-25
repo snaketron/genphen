@@ -1,0 +1,2 @@
+CXX14 = g++
+CXX14FLAGS = -O3
