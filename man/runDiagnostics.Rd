@@ -117,15 +117,15 @@ data(phenotype.saap)
 continuous.diagnostics <- runDiagnostics(genotype = genotype.saap,
                                          phenotype = phenotype.saap,
                                          phenotype.type = "continuous",
-                                         rf.trees = 50000,
+                                         rf.trees = 5000,
                                          mcmc.chains = 2,
-                                         mcmc.iterations = 2500,
+                                         mcmc.iterations = 1500,
                                          mcmc.warmup = 500,
                                          cores = 2,
                                          hdi.level = 0.95,
                                          diagnostic.points = seq(from = 1, 
                                                                  to = 100, 
-                                                                 by = 10))
+                                                                 by = 15))
 }
 
 \seealso{

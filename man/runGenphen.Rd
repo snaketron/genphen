@@ -201,7 +201,7 @@ data(genotype.saap)
 data(phenotype.saap)
 
 # run genphen
-continuous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
+continuous.analysis <- runGenphen(genotype = genotype.saap[, 82],
                                   phenotype = phenotype.saap,
                                   phenotype.type = "continuous",
                                   model.type = "univariate",
@@ -223,7 +223,7 @@ data(genotype.saap)
 data(dichotomous.phenotype.saap)
 
 # run genphen
-dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 1:3],
+dichotomous.analysis <- runGenphen(genotype = genotype.saap[, 82],
                                    phenotype = dichotomous.phenotype.saap,
                                    phenotype.type = "dichotomous",
                                    model.type = "univariate",
