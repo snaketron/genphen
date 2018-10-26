@@ -17,6 +17,9 @@ runGenphen <- function(genotype,
                        with.stan.obj = FALSE,
                        ...) {
   
+  # Set CX14
+  Sys.setenv(USE_CXX14 = 1)
+  
   # check optional (dot) inputs
   dot.param <- checkDotParameters(...)
   
@@ -278,6 +281,8 @@ runDiagnostics <- function(genotype,
                            diagnostic.points,
                            ...) {
   
+  # Set CX14
+  Sys.setenv(USE_CXX14 = 1)
   
   # check inputs
   checkInput(genotype = genotype,

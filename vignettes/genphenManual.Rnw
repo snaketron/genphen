@@ -348,6 +348,8 @@ require(reshape)
 require(ape)
 require(xtable)
 options(xtable.floating = FALSE)
+# Set CX14
+Sys.setenv(USE_CXX14 = 1)
 @
 \end{scriptsize}
 
