@@ -6,4 +6,4 @@ genphen_bioconductor.Rproj
 .Rbuildignore
 my.tests/
 README.md
-genphen_github.Rproj
+genphen.Rproj

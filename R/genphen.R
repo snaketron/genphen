@@ -17,8 +17,6 @@ runGenphen <- function(genotype,
                        with.stan.obj = FALSE,
                        ...) {
   
-  # Set CX14
-  Sys.setenv(USE_CXX14 = 1)
   
   # check optional (dot) inputs
   dot.param <- checkDotParameters(...)
@@ -38,6 +36,10 @@ runGenphen <- function(genotype,
              cv.iterations = cv.iterations,
              rpa.iterations = rpa.iterations,
              with.stan.obj = with.stan.obj)
+  
+  
+  # makevar settup
+  getRstanMakevar()
   
   
   # convert AAMultipleAlignment to matrix if needed
@@ -281,8 +283,10 @@ runDiagnostics <- function(genotype,
                            diagnostic.points,
                            ...) {
   
-  # Set CX14
-  Sys.setenv(USE_CXX14 = 1)
+  
+  # makevar settup
+  getRstanMakevar()
+  
   
   # check inputs
   checkInput(genotype = genotype,
@@ -486,6 +490,11 @@ runDiagnostics <- function(genotype,
 
 runPhyloBiasCheck <- function(input.kinship.matrix,
                               genotype) {
+  
+  
+  # makevar settup
+  getRstanMakevar()
+  
   
   # check params
   checkInputPhyloBias(input.kinship.matrix = input.kinship.matrix,
