@@ -74,7 +74,6 @@ runGenphen <- function(genotype,
   model.stan <- compileModel(phenotype.type = phenotype.type, 
                              model.type = model.type)
   
-  
   j <- NULL
   if(model.type == "univariate") {
     cat("======== Main Analysis Running (Univariate) ======== \n")
@@ -97,7 +96,9 @@ runGenphen <- function(genotype,
                              with.stan.obj = with.stan.obj,
                              adapt_delta = dot.param$adapt_delta,
                              max_treedepth = dot.param$max_treedepth,
-                             rpa.significant = dot.param$rpa.significant))
+                             rpa.significant = dot.param$rpa.significant,
+                             refresh = dot.param$refresh,
+                             verbose = dot.param$verbose))
     }
     else if(phenotype.type == "dichotomous") {
       o <- (foreach(j = 1:max(genphen.data$J),
@@ -115,7 +116,9 @@ runGenphen <- function(genotype,
                              with.stan.obj = with.stan.obj,
                              adapt_delta = dot.param$adapt_delta,
                              max_treedepth = dot.param$max_treedepth,
-                             rpa.significant = dot.param$rpa.significant))
+                             rpa.significant = dot.param$rpa.significant,
+                             refresh = dot.param$refresh,
+                             verbose = dot.param$verbose))
     }
     # stop cluster
     parallel::stopCluster(cl = cl)
@@ -136,7 +139,9 @@ runGenphen <- function(genotype,
                     with.stan.obj = with.stan.obj,
                     adapt_delta = dot.param$adapt_delta,
                     max_treedepth = dot.param$max_treedepth,
-                    rpa.significant = dot.param$rpa.significant)
+                    rpa.significant = dot.param$rpa.significant,
+                    refresh = dot.param$refresh,
+                    verbose = dot.param$verbose)
     }
     else if(phenotype.type == "dichotomous") {
       o <- runDichH(genphen.data = genphen.data,
@@ -150,7 +155,9 @@ runGenphen <- function(genotype,
                     with.stan.obj = with.stan.obj,
                     adapt_delta = dot.param$adapt_delta,
                     max_treedepth = dot.param$max_treedepth,
-                    rpa.significant = dot.param$rpa.significant)
+                    rpa.significant = dot.param$rpa.significant,
+                    refresh = dot.param$refresh,
+                    verbose = dot.param$verbose)
     }
   }
   
@@ -424,7 +431,9 @@ runDiagnostics <- function(genotype,
                            with.stan.obj = FALSE,
                            adapt_delta = dot.param$adapt_delta,
                            max_treedepth = dot.param$max_treedepth,
-                           rpa.significant = dot.param$rpa.significant))
+                           rpa.significant = dot.param$rpa.significant,
+                           refresh = dot.param$refresh,
+                           verbose = dot.param$verbose))
   }
   else if(phenotype.type == "dichotomous") {
     o <- (foreach(j = 1:length(Js),
@@ -442,7 +451,9 @@ runDiagnostics <- function(genotype,
                            with.stan.obj = FALSE,
                            adapt_delta = dot.param$adapt_delta,
                            max_treedepth = dot.param$max_treedepth,
-                           rpa.significant = dot.param$rpa.significant))
+                           rpa.significant = dot.param$rpa.significant,
+                           refresh = dot.param$refresh,
+                           verbose = dot.param$verbose))
   }
   # stop cluster
   parallel::stopCluster(cl = cl)

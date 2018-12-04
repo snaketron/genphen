@@ -236,17 +236,42 @@ checkDotParameters <- function(...) {
     }
   }
   
+  checkVerbose <- function(verbose) {
+    if(length(verbose) != 1) {
+      stop("verbose is a logical parameter.")
+    }
+    
+    if(is.logical(verbose) == FALSE) {
+      stop("verbose is a logical parameter.")
+    }
+  }
+  
+  checkRefresh <- function(refresh) {
+    if(length(refresh) != 1) {
+      stop("refresh is numeric parameter.")
+    }
+    
+    if(is.numeric(refresh) == FALSE) {
+      stop("refresh is a numeric parameter.")
+    }
+    
+    return (refresh)
+  }
   
   available.names <- c("adapt_delta", 
                        "max_treedepth", 
                        "ntree", 
                        "cv.fold", 
-                       "rpa.significant")
+                       "rpa.significant",
+                       "refresh",
+                       "verbose")
   default.values <- list(adapt_delta = 0.9, 
                          max_treedepth = 10,
                          ntree = 1000, 
                          cv.fold = 0.66, 
-                         rpa.significant = TRUE)
+                         rpa.significant = TRUE,
+                         refresh = 250,
+                         verbose = TRUE)
   
   # get the optional parameters
   dot.names <- names(list(...))
@@ -283,6 +308,14 @@ checkDotParameters <- function(...) {
     if(p == "ntree") {
       checkNtree(ntree = list(...)[[p]])
       default.values[["ntree"]] <- list(...)[[p]]
+    }
+    if(p == "refresh") {
+      checkRefresh(refresh = list(...)[[p]])
+      default.values[["refresh"]] <- list(...)[[p]]
+    }
+    if(p == "verbose") {
+      checkVerbose(verbose = list(...)[[p]])
+      default.values[["verbose"]] <- list(...)[[p]]
     }
   }
   
@@ -1247,8 +1280,10 @@ runContU <- function(genphen.data,
   
   
   # get initial parameter values
-  control = list(adapt_delta = list(...)[["adapt_delta"]],
+  control <- list(adapt_delta = list(...)[["adapt_delta"]],
                  max_treedepth = list(...)[["max_treedepth"]])
+  verbose <- list(...)[["verbose"]]
+  refresh <- list(...)[["refresh"]]
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                pars = c("alpha", "beta", "sigma", "nu"),
@@ -1257,8 +1292,8 @@ runContU <- function(genphen.data,
                                chains = mcmc.chains,
                                cores = cores,
                                control = control,
-                               verbose = FALSE,
-                               refresh = -1)
+                               verbose = verbose,
+                               refresh = refresh)
   
   
   # if with.model == TRUE, keep the stan object
@@ -1555,8 +1590,10 @@ runContH <- function(genphen.data,
   
   
   # get initial parameter values
-  control = list(adapt_delta = list(...)[["adapt_delta"]],
+  control <- list(adapt_delta = list(...)[["adapt_delta"]],
                  max_treedepth = list(...)[["max_treedepth"]])
+  refresh <- list(...)[["refresh"]]
+  verbose <- list(...)[["verbose"]]
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                iter = mcmc.iterations,
@@ -1564,8 +1601,8 @@ runContH <- function(genphen.data,
                                chains = mcmc.chains,
                                cores = cores,
                                control = control,
-                               verbose = FALSE,
-                               refresh = -1)
+                               verbose = verbose,
+                               refresh = refresh)
   
   
   # if with.model == TRUE, keep the stan object
@@ -1721,8 +1758,10 @@ runDichU <- function(genphen.data,
   
   
   # get initial parameter values
-  control = list(adapt_delta = list(...)[["adapt_delta"]],
-                 max_treedepth = list(...)[["max_treedepth"]])
+  control <- list(adapt_delta = list(...)[["adapt_delta"]],
+                  max_treedepth = list(...)[["max_treedepth"]])
+  refresh <- list(...)[["refresh"]]
+  verbose <- list(...)[["verbose"]]
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                pars = c("alpha", "beta"),
@@ -1731,8 +1770,8 @@ runDichU <- function(genphen.data,
                                chains = mcmc.chains,
                                cores = cores,
                                control = control,
-                               verbose = FALSE,
-                               refresh = -1)
+                               verbose = verbose,
+                               refresh = refresh)
   
   
   # if with.model == TRUE, keep the stan object
@@ -2010,8 +2049,10 @@ runDichH <- function(genphen.data,
   
   
   # get initial parameter values
-  control = list(adapt_delta = list(...)[["adapt_delta"]],
-                 max_treedepth = list(...)[["max_treedepth"]])
+  control <- list(adapt_delta = list(...)[["adapt_delta"]],
+                  max_treedepth = list(...)[["max_treedepth"]])
+  refresh <- list(...)[["refresh"]]
+  verbose <- list(...)[["verbose"]]
   posterior <- rstan::sampling(object = model.stan,
                                data = data.list,
                                iter = mcmc.iterations,
@@ -2019,8 +2060,8 @@ runDichH <- function(genphen.data,
                                chains = mcmc.chains,
                                cores = cores,
                                control = control,
-                               verbose = FALSE,
-                               refresh = -1)
+                               verbose = verbose,
+                               refresh = refresg)
   
   # if with.model == TRUE, keep the stan object
   stan.obj <- NULL
@@ -2208,8 +2249,11 @@ getRpaCont <- function(posterior,
     data.list <- list(X = rep(x = c(1, 0), times = c(n1, n0)),
                       Y = c(y1, y0), Z = n0+n1)
     
+    # get initial parameter values
     control <- list(adapt_delta = list(...)[["adapt_delta"]],
                     max_treedepth = list(...)[["max_treedepth"]])
+    refresh <- list(...)[["refresh"]]
+    verbose <- list(...)[["verbose"]]
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta", "sigma", "nu"),
@@ -2218,8 +2262,8 @@ getRpaCont <- function(posterior,
                                      chains = mcmc.chains,
                                      cores = 1,
                                      control = control,
-                                     verbose = FALSE,
-                                     refresh = -1)
+                                     verbose = verbose,
+                                     refresh = refresh)
     
     # compute posterior summary
     hdi.L <- (1-hdi.level)/2
@@ -2317,8 +2361,11 @@ getRpaDich <- function(posterior,
     y0 <- stats::rbinom(n = 1, prob = 1/(1+exp(-(p[1]+p[2]*0))), size = n0)
     data.list <- list(X = c(1, 0), Y = c(y1, y0), N = c(n1, n0), Z = 2)
     
+    # get initial parameter values
     control <- list(adapt_delta = list(...)[["adapt_delta"]],
                     max_treedepth = list(...)[["max_treedepth"]])
+    refresh <- list(...)[["refresh"]]
+    verbose <- list(...)[["verbose"]]
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta"),
@@ -2327,8 +2374,8 @@ getRpaDich <- function(posterior,
                                      chains = mcmc.chains,
                                      cores = 1,
                                      control = control,
-                                     verbose = FALSE,
-                                     refresh = -1)
+                                     verbose = verbose,
+                                     refresh = refresg)
     
     # compute posterior summary
     hdi.L <- (1-hdi.level)/2
