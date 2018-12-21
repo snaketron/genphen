@@ -38,10 +38,6 @@ runGenphen <- function(genotype,
              with.stan.obj = with.stan.obj)
   
   
-  # makevar settup
-  getRstanMakevar()
-  
-  
   # convert AAMultipleAlignment to matrix if needed
   genotype <- convertMsaToGenotype(genotype = genotype)
   
@@ -291,9 +287,6 @@ runDiagnostics <- function(genotype,
                            ...) {
   
   
-  # makevar settup
-  getRstanMakevar()
-  
   
   # check inputs
   checkInput(genotype = genotype,
@@ -502,9 +495,6 @@ runDiagnostics <- function(genotype,
 runPhyloBiasCheck <- function(input.kinship.matrix,
                               genotype) {
   
-  
-  # makevar settup
-  getRstanMakevar()
   
   
   # check params
