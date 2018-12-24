@@ -2,7 +2,7 @@ Package: genphen
 Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes with Bayesian inference and statistical learning techniques
-Version: 1.11.3
+Version: 1.11.4
 Date: 2018-12-20
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
@@ -18,4 +18,5 @@ LazyLoad: yes
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,
     FeatureExtraction, Sequencing
-NeedsCompilation: no
+SystemRequirements: GNU make, pandoc (>= 1.12.3), pandoc-citeproc
+NeedsCompilation: yes

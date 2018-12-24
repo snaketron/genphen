@@ -1462,7 +1462,6 @@ runContH <- function(genphen.data,
                          stats, hdi.level, mcmc.chains, mcmc.iterations, 
                          mcmc.warmup, model.stan, rpa.iterations, ...) {
     
-    
     # ppc
     ppc.fun <- function(p, x, n) {
       return(p[1]+p[2]*x+p[3]*stats::rt(n = 1, df = p[4]))
@@ -2061,7 +2060,7 @@ runDichH <- function(genphen.data,
                                cores = cores,
                                control = control,
                                verbose = verbose,
-                               refresh = refresg)
+                               refresh = refresh)
   
   # if with.model == TRUE, keep the stan object
   stan.obj <- NULL
@@ -2252,8 +2251,6 @@ getRpaCont <- function(posterior,
     # get initial parameter values
     control <- list(adapt_delta = list(...)[["adapt_delta"]],
                     max_treedepth = list(...)[["max_treedepth"]])
-    refresh <- list(...)[["refresh"]]
-    verbose <- list(...)[["verbose"]]
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta", "sigma", "nu"),
@@ -2262,8 +2259,8 @@ getRpaCont <- function(posterior,
                                      chains = mcmc.chains,
                                      cores = 1,
                                      control = control,
-                                     verbose = verbose,
-                                     refresh = refresh)
+                                     verbose = FALSE,
+                                     refresh = -1)
     
     # compute posterior summary
     hdi.L <- (1-hdi.level)/2
@@ -2364,8 +2361,6 @@ getRpaDich <- function(posterior,
     # get initial parameter values
     control <- list(adapt_delta = list(...)[["adapt_delta"]],
                     max_treedepth = list(...)[["max_treedepth"]])
-    refresh <- list(...)[["refresh"]]
-    verbose <- list(...)[["verbose"]]
     ppc.posterior <- rstan::sampling(object = model.stan,
                                      data = data.list,
                                      pars = c("alpha", "beta"),
@@ -2374,8 +2369,8 @@ getRpaDich <- function(posterior,
                                      chains = mcmc.chains,
                                      cores = 1,
                                      control = control,
-                                     verbose = verbose,
-                                     refresh = refresg)
+                                     verbose = FALSE,
+                                     refresh = -1)
     
     # compute posterior summary
     hdi.L <- (1-hdi.level)/2
