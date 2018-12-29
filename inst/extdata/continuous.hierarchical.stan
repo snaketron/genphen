@@ -13,8 +13,8 @@ parameters {
   real <lower = 0> sigma;
   real mu_alpha;
   real mu_beta;
-  real <lower = 0> sd_alpha;
-  real <lower = 0> sd_beta;
+  real <lower = 0> sigma_alpha;
+  real <lower = 0> sigma_beta;
   real <lower = 1> nu_alpha;
   real <lower = 1> nu_beta;
 }
@@ -25,8 +25,8 @@ model {
   }
   
   for(j in 1:S_N) {
-    alpha[j] ~ student_t(nu_alpha, mu_alpha, sd_alpha);
-    beta[j] ~ student_t(nu_beta, mu_beta, sd_beta);
+    alpha[j] ~ student_t(nu_alpha, mu_alpha, sigma_alpha);
+    beta[j] ~ student_t(nu_beta, mu_beta, sigma_beta);
   }
   
   mu_alpha ~ student_t(1, 0, 100);
@@ -37,6 +37,6 @@ model {
   nu_beta ~ gamma(2, 0.1);
 
   sigma ~ cauchy(0, 1);
-  sd_alpha ~ cauchy(0, 1);
-  sd_beta ~ cauchy(0, 1);
+  sigma_alpha ~ cauchy(0, 1);
+  sigma_beta ~ cauchy(0, 1);
 }

@@ -15,6 +15,7 @@ model {
   for(i in 1:Z) {
     Y[i] ~ binomial_logit(N[i], alpha+beta*X[i]);
   }
-  alpha ~ normal(0, 100);
-  beta ~ normal(0, 10);
+  
+  alpha ~ student_t(1, 0, 100);
+  beta ~ student_t(1, 0, 10);
 }

@@ -1632,7 +1632,7 @@ runContH <- function(genphen.data,
   stats <- rstan::summary(object = posterior, 
                           pars = c("alpha", "beta", "sigma", "nu",
                                    "mu_alpha", "mu_beta",
-                                   "sd_alpha", "sd_beta",
+                                   "sigma_alpha", "sigma_beta",
                                    "nu_alpha", "nu_beta"), 
                           prob = c(hdi.L, hdi.H))$summary
   
@@ -1641,12 +1641,12 @@ runContH <- function(genphen.data,
   convergence.out <- c()
   c.row <- data.frame(stats[c("sigma", "nu", 
                               "mu_alpha", "mu_beta", 
-                              "sd_alpha", "sd_beta", 
+                              "sigma_alpha", "sigma_beta", 
                               "nu_alpha", "nu_beta"), 
                             c("Rhat", "n_eff")], stringsAsFactors = FALSE)
   c.row$par <- c("sigma", "nu", 
                  "mu_alpha", "mu_beta", 
-                 "sd_alpha", "sd_beta",
+                 "sigma_alpha", "sigma_beta",
                  "nu_alpha", "nu_beta")
   c.row$site <- ''
   c.row$g1 <- ''
@@ -2092,7 +2092,7 @@ runDichH <- function(genphen.data,
   stats <- rstan::summary(object = posterior, 
                           pars = c("alpha", "beta", 
                                    "mu_alpha", "mu_beta",
-                                   "sd_alpha", "sd_beta",
+                                   "sigma_alpha", "sigma_beta",
                                    "nu_alpha", "nu_beta"), 
                           prob = c(hdi.L, hdi.H))$summary
   
@@ -2101,12 +2101,12 @@ runDichH <- function(genphen.data,
   # convergence data
   convergence.out <- c()
   c.row <- data.frame(stats[c("mu_alpha", "mu_beta", 
-                              "sd_alpha", "sd_beta",
+                              "sigma_alpha", "sigma_beta",
                               "nu_alpha", "nu_beta"), 
                             c("Rhat", "n_eff")], 
                       stringsAsFactors = FALSE)
   c.row$par <- c("mu_alpha", "mu_beta", 
-                 "sd_alpha", "sd_beta", 
+                 "sigma_alpha", "sigma_beta", 
                  "nu_alpha", "nu_beta")
   c.row$site <- ''
   c.row$g1 <- ''
