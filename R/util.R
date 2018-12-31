@@ -1,6 +1,7 @@
 
 
 
+
 # Description:
 # Computes HDI given a vector, taken "Doing Bayesian Analysis"
 getHdi <- function(vec, hdi.level) {
@@ -26,6 +27,12 @@ getHdi <- function(vec, hdi.level) {
 # different kappa ranges.
 getKappa <- function(predicted, real, aas) {
   
+  # should not occur, just in case check this
+  if(length(unique(aas)) != length(unique(c(predicted, real)))) {
+    stop("Error while building confusion matrix (getKappa)")
+  }
+  
+  # Build 2x2 confusion matrix
   buildConfusionMatrix <- function(predicted, real) {
     cm <- matrix(data = 0, nrow = 2, ncol = 2)
     cm[1, 1] <- length(intersect(which(real %in% aas[1]),
@@ -44,6 +51,11 @@ getKappa <- function(predicted, real, aas) {
   ca.exp <- (sum(cm[1, ])*sum(cm[, 1])+sum(cm[2, ])*sum(cm[, 2]))/sum(cm)^2
   ca <- (cm[1, 1]+cm[2, 2])/sum(cm)
   kappa <- (ca-ca.exp)/(1-ca.exp)
+  
+  # if NaN, CA_exp = 1
+  if(is.nan(x = kappa) == TRUE) {
+    kappa <- 0
+  }
   
   return (kappa)
 }
@@ -117,12 +129,7 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
   #Calculating the Bhattacharyya Coefficient (sum of the square root of
   # the multiple of the relative counts of both distributions)
   bc <- sum(sqrt(rel.histx*rel.histy))
-  b.coef.x <- sum(sqrt((histx[histx != 0]/sum(histx[histx != 0]))*
-                         (histy[histx != 0]/sum(histy[histx != 0]))))
-  b.coef.y <- sum(sqrt((histx[histy != 0]/sum(histx[histy != 0]))*
-                         (histy[histy != 0]/sum(histy[histy != 0]))))
-  b.coef.max <- max(b.coef.x, b.coef.y)
-  return(list(bc = bc, b.coef.max = b.coef.max))
+  return(list(bc = bc))
 }
 
 
@@ -155,7 +162,6 @@ compileModel <- function(phenotype.type, model.type) {
 
 
 
-
 # Description:
 # If an object of type DNAMultipleAlignment
 convertMsaToGenotype <- function(genotype) {
@@ -164,5 +170,6 @@ convertMsaToGenotype <- function(genotype) {
   }
   return (genotype)
 }
+
 
 

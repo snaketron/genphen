@@ -8,6 +8,12 @@
 my.tests/
 README.md
 
+
+# test
+src/genphen.so
+src/init.o
+
+
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
