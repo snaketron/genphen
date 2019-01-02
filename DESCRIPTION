@@ -2,7 +2,7 @@ Package: genphen
 Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes with Bayesian inference and statistical learning
-Version: 1.11.9
+Version: 1.11.10
 Date: 2018-12-30
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>

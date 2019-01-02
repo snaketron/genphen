@@ -28,9 +28,9 @@ getHdi <- function(vec, hdi.level) {
 getKappa <- function(predicted, real, aas) {
   
   # should not occur, just in case check this
-  if(length(unique(aas)) != length(unique(c(predicted, real)))) {
-    stop("Error while building confusion matrix (getKappa)")
-  }
+  # if(length(unique(aas)) != length(unique(c(predicted, real)))) {
+  #   stop("Error while building confusion matrix (getKappa)")
+  # }
   
   # Build 2x2 confusion matrix
   buildConfusionMatrix <- function(predicted, real) {
