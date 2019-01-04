@@ -9,5 +9,5 @@ test_check("genphen")
 # 3. Repeat until all tests pass.
 
 
-library(testthat)
-devtools::test()
+# library(testthat)
+# devtools::test()
