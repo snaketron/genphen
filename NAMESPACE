@@ -6,11 +6,14 @@ export(
 
 # Import packages listed as Imports or Depends
 import(
+  Rcpp,
+  methods,
   stats,
   graphics,
   e1071,
   Biostrings,
   rstan,
+  rstantools,
   ranger,
   parallel,
   foreach,
@@ -19,3 +22,4 @@ import(
 importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")
 #exportPattern("^[[:alpha:]]+")
+useDynLib(genphen, .registration = TRUE)
