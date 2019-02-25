@@ -1671,13 +1671,6 @@ runContH <- function(genphen.data,
   posterior <- data.frame(rstan::extract(posterior))
   
   
-  # special case for RPA, compile univariate stan model
-  if(rpa.iterations > 0) {
-    cat("======== Compiling RPA Model ======== \n")
-    model.stan <- compileModel(phenotype.type = "continuous", 
-                                   model.type = "univariate")
-  }
-  
   
   # register cluster and go through all snps to extract stats, ppc, rpa
   cl <- parallel::makeCluster(cores)
@@ -1697,7 +1690,7 @@ runContH <- function(genphen.data,
                            mcmc.chains = mcmc.chains, 
                            mcmc.iterations = mcmc.iterations, 
                            mcmc.warmup = mcmc.warmup, 
-                           model.stan = model.stan, 
+                           model.stan = stanmodels$cont_univ, 
                            rpa.iterations = rpa.iterations,
                            adapt_delta = list(...)[["adapt_delta"]],
                            max_treedepth = list(...)[["max_treedepth"]],
@@ -2129,14 +2122,7 @@ runDichH <- function(genphen.data,
   # posterior data
   posterior <- data.frame(rstan::extract(posterior))
   
-  
-  # special case for RPA, compile univariate stan model
-  if(rpa.iterations > 0) {
-    cat("======== Compiling RPA Model ======== \n")
-    model.stan <- compileModel(phenotype.type = "dichotomous", 
-                                   model.type = "univariate")
-  }
-  
+
   
   # register cluster and go through all snps to extract stats, ppc, rpa
   cl <- parallel::makeCluster(cores)
@@ -2155,7 +2141,7 @@ runDichH <- function(genphen.data,
                            mcmc.chains = mcmc.chains,
                            mcmc.iterations = mcmc.iterations,
                            mcmc.warmup = mcmc.warmup,
-                           model.stan = model.stan,
+                           model.stan = stanmodels$dich_univ,
                            rpa.iterations = rpa.iterations,
                            adapt_delta = list(...)[["adapt_delta"]],
                            max_treedepth = list(...)[["max_treedepth"]],

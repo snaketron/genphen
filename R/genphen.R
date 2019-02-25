@@ -67,8 +67,10 @@ runGenphen <- function(genotype,
   
   # compile model
   cat("======== Compiling Main Model ======== \n")
-  model.stan <- compileModel(phenotype.type = phenotype.type, 
-                             model.type = model.type)
+  # model.stan <- compileModel(phenotype.type = phenotype.type, 
+  #                            model.type = model.type)
+  
+  # browser()
   
   j <- NULL
   if(model.type == "univariate") {
@@ -87,7 +89,7 @@ runGenphen <- function(genotype,
                              mcmc.warmup = mcmc.warmup,
                              cores = 1,
                              hdi.level = hdi.level,
-                             model.stan = model.stan,
+                             model.stan = stanmodels$cont_univ,
                              rpa.iterations = rpa.iterations,
                              with.stan.obj = with.stan.obj,
                              adapt_delta = dot.param$adapt_delta,
@@ -107,7 +109,7 @@ runGenphen <- function(genotype,
                              mcmc.warmup = mcmc.warmup,
                              cores = 1,
                              hdi.level = hdi.level,
-                             model.stan = model.stan,
+                             model.stan = stanmodels$dich_univ,
                              rpa.iterations = rpa.iterations,
                              with.stan.obj = with.stan.obj,
                              adapt_delta = dot.param$adapt_delta,
@@ -130,7 +132,7 @@ runGenphen <- function(genotype,
                     mcmc.warmup = mcmc.warmup,
                     cores = cores,
                     hdi.level = hdi.level,
-                    model.stan = model.stan,
+                    model.stan = stanmodels$cont_hier,
                     rpa.iterations = rpa.iterations,
                     with.stan.obj = with.stan.obj,
                     adapt_delta = dot.param$adapt_delta,
@@ -146,7 +148,7 @@ runGenphen <- function(genotype,
                     mcmc.warmup = mcmc.warmup,
                     cores = cores,
                     hdi.level = hdi.level,
-                    model.stan = model.stan,
+                    model.stan = stanmodels$dich_hier,
                     rpa.iterations = rpa.iterations,
                     with.stan.obj = with.stan.obj,
                     adapt_delta = dot.param$adapt_delta,
@@ -397,8 +399,8 @@ runDiagnostics <- function(genotype,
   
   # compile model
   cat("======== Compiling Diagnostic Model ======== \n")
-  model.stan <- compileModel(phenotype.type = phenotype.type, 
-                             model.type = "univariate")
+  # model.stan <- compileModel(phenotype.type = phenotype.type, 
+  #                            model.type = "univariate")
   
   
   cat("======== Main Analysis Running ======== \n")
@@ -419,7 +421,7 @@ runDiagnostics <- function(genotype,
                            mcmc.warmup = mcmc.warmup,
                            cores = 1,
                            hdi.level = hdi.level,
-                           model.stan = model.stan,
+                           model.stan = stanmodels$cont_univ,
                            rpa.iterations = 0,
                            with.stan.obj = FALSE,
                            adapt_delta = dot.param$adapt_delta,
@@ -439,7 +441,7 @@ runDiagnostics <- function(genotype,
                            mcmc.warmup = mcmc.warmup,
                            cores = 1,
                            hdi.level = hdi.level,
-                           model.stan = model.stan,
+                           model.stan = stanmodels$dich_univ,
                            rpa.iterations = 0,
                            with.stan.obj = FALSE,
                            adapt_delta = dot.param$adapt_delta,

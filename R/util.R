@@ -139,13 +139,13 @@ getBhattacharyya <- function(x, y, bw = bw.nrd0, ...) {
 # Given phenotype.type and model.type, the procedure compiles the STAN model.
 compileModel <- function(phenotype.type, model.type) {
   if(phenotype.type == "continuous") {
-    f.local <- paste("inst/extdata/continuous", model.type, "stan", sep = '.')
-    f.pkg <- system.file("extdata", package = "genphen",
+    f.local <- paste("src/stan_files/continuous", model.type, "stan", sep = '.')
+    f.pkg <- system.file("src/stan_files", package = "genphen",
                          paste("continuous", model.type, "stan", sep = '.'))
   }
   else if(phenotype.type == "dichotomous") {
-    f.local <- paste("inst/extdata/dichotomous", model.type, "stan", sep = '.')
-    f.pkg <- system.file("extdata", package = "genphen",
+    f.local <- paste("src/stan_files/dichotomous", model.type, "stan", sep ='.')
+    f.pkg <- system.file("src/stan_files", package = "genphen",
                          paste("dichotomous", model.type, "stan", sep = '.'))
   }
   
