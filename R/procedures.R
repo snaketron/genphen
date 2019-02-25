@@ -757,7 +757,6 @@ getRfCa <- function(genphen.data,
                     ntree) {
   
   
-  
   # Description:
   # Performs the bootstrapping iteratively and breaks if convergence
   # is met before the number of steps is hit.
