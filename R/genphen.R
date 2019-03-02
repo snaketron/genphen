@@ -7,14 +7,12 @@ runGenphen <- function(genotype,
                        phenotype.type,
                        model.type,
                        mcmc.chains = 2,
-                       mcmc.iterations = 2500,
+                       mcmc.steps = 2500,
                        mcmc.warmup = 500,
                        cores = 1,
                        hdi.level = 0.95,
                        stat.learn.method = "rf",
-                       cv.iterations = 1000,
-                       rpa.iterations = 0,
-                       with.stan.obj = FALSE,
+                       cv.steps = 1000,
                        ...) {
   
   
@@ -28,249 +26,113 @@ runGenphen <- function(genotype,
              phenotype.type = phenotype.type,
              model.type = model.type,
              mcmc.chains = mcmc.chains,
-             mcmc.iterations = mcmc.iterations,
+             mcmc.steps = mcmc.steps,
              mcmc.warmup = mcmc.warmup,
              cores = cores,
              hdi.level = hdi.level,
              stat.learn.method = stat.learn.method,
-             cv.iterations = cv.iterations,
-             rpa.iterations = rpa.iterations,
-             with.stan.obj = with.stan.obj)
+             cv.steps = cv.steps)
   
   
-  # convert AAMultipleAlignment to matrix if needed
-  genotype <- convertMsaToGenotype(genotype = genotype)
+  # TODO: test
+  # convert input data to stan data
+  genphen.data <- getStanData(genotype = genotype,
+                              phenotype = phenotype,
+                              phenotype.type = phenotype.type)
   
   
-  # if vector genotype => matrix genotype
-  if(is.vector(genotype)) {
-    genotype <- matrix(data = genotype, ncol = 1)
-  }
-  
-  
-  # if phenotype = dichotomous => convert to 1s and 0s
-  if(phenotype.type == "dichotomous") {
-    phenotype.new <- as.numeric(as.factor(phenotype))-1
-    cat("Phenotype mapping to 1s and 0s: \n")
-    print(table(phenotype.new, phenotype))
-  }
-  
-  
-  # genphen.data and final check for input
-  genphen.data <- getGenphenData(genotype = genotype,
-                                 phenotype = phenotype,
-                                 cores = cores)
+  # TODO: needed anymore?
   if(is.null(genphen.data)) {
     stop("No genphen input data found.")
   }
   
-  
-  # compile model
-  cat("======== Compiling Main Model ======== \n")
-  # model.stan <- compileModel(phenotype.type = phenotype.type, 
-  #                            model.type = model.type)
-  
-  # browser()
-  
-  j <- NULL
-  if(model.type == "univariate") {
-    cat("======== Main Analysis Running (Univariate) ======== \n")
-    # register parallel
-    cl <- parallel::makeCluster(cores)
-    doParallel::registerDoParallel(cl)
-    if(phenotype.type == "continuous") {
-      o <- (foreach(j = 1:max(genphen.data$J),
-                    .export = c("runContU", "getHdi", "getGenphenData",
-                                "getBhattacharyya", "getRpaCont"), 
-                    .packages = c("rstan"))
-            %dopar% runContU(genphen.data = genphen.data[genphen.data$J == j, ],
-                             mcmc.chains = mcmc.chains,
-                             mcmc.iterations = mcmc.iterations,
-                             mcmc.warmup = mcmc.warmup,
-                             cores = 1,
-                             hdi.level = hdi.level,
-                             model.stan = stanmodels$cont_univ,
-                             rpa.iterations = rpa.iterations,
-                             with.stan.obj = with.stan.obj,
-                             adapt_delta = dot.param$adapt_delta,
-                             max_treedepth = dot.param$max_treedepth,
-                             rpa.significant = dot.param$rpa.significant,
-                             refresh = dot.param$refresh,
-                             verbose = dot.param$verbose))
-    }
-    else if(phenotype.type == "dichotomous") {
-      o <- (foreach(j = 1:max(genphen.data$J),
-                    .export = c("runDichU", "getHdi", "getGenphenData",
-                                "getBhattacharyya", "getRpaDich"), 
-                    .packages = c("rstan"))
-            %dopar% runDichU(genphen.data = genphen.data[genphen.data$J == j, ],
-                             mcmc.chains = mcmc.chains,
-                             mcmc.iterations = mcmc.iterations,
-                             mcmc.warmup = mcmc.warmup,
-                             cores = 1,
-                             hdi.level = hdi.level,
-                             model.stan = stanmodels$dich_univ,
-                             rpa.iterations = rpa.iterations,
-                             with.stan.obj = with.stan.obj,
-                             adapt_delta = dot.param$adapt_delta,
-                             max_treedepth = dot.param$max_treedepth,
-                             rpa.significant = dot.param$rpa.significant,
-                             refresh = dot.param$refresh,
-                             verbose = dot.param$verbose))
-    }
-    # stop cluster
-    parallel::stopCluster(cl = cl)
-    doParallel::stopImplicitCluster()
-  }
-  
-  if(model.type == "hierarchical") {
-    cat("======== Main Analysis Running (Hierarchical) ======== \n")
-    if(phenotype.type == "continuous") {
-      o <- runContH(genphen.data = genphen.data,
-                    mcmc.chains = mcmc.chains,
-                    mcmc.iterations = mcmc.iterations,
-                    mcmc.warmup = mcmc.warmup,
-                    cores = cores,
-                    hdi.level = hdi.level,
-                    model.stan = stanmodels$cont_hier,
-                    rpa.iterations = rpa.iterations,
-                    with.stan.obj = with.stan.obj,
-                    adapt_delta = dot.param$adapt_delta,
-                    max_treedepth = dot.param$max_treedepth,
-                    rpa.significant = dot.param$rpa.significant,
-                    refresh = dot.param$refresh,
-                    verbose = dot.param$verbose)
-    }
-    else if(phenotype.type == "dichotomous") {
-      o <- runDichH(genphen.data = genphen.data,
-                    mcmc.chains = mcmc.chains,
-                    mcmc.iterations = mcmc.iterations,
-                    mcmc.warmup = mcmc.warmup,
-                    cores = cores,
-                    hdi.level = hdi.level,
-                    model.stan = stanmodels$dich_hier,
-                    rpa.iterations = rpa.iterations,
-                    with.stan.obj = with.stan.obj,
-                    adapt_delta = dot.param$adapt_delta,
-                    max_treedepth = dot.param$max_treedepth,
-                    rpa.significant = dot.param$rpa.significant,
-                    refresh = dot.param$refresh,
-                    verbose = dot.param$verbose)
-    }
-  }
+  # model.stan <- umi
+  model.stan <- hmi
   
   
-  cat("======== Statistical Learning ======== \n")
-  # register parallel
-  cl <- parallel::makeCluster(cores)
-  doParallel::registerDoParallel(cl)
-  if(stat.learn.method == "none") {
-    cas <- (foreach(j = 1:max(genphen.data$J),
-                    .export = c("getNoneCa"),
-                    .packages = c("ranger")) %dopar%
-              getNoneCa(genphen.data = genphen.data[genphen.data$J == j, ]))
-  }
-  else if(stat.learn.method == "rf") {
-    cas <- (foreach(j = 1:max(genphen.data$J),
-                    .export = c("getRfCa", "getHdi", "getKappa"),
-                    .packages = c("ranger")) %dopar%
-              getRfCa(genphen.data = genphen.data[genphen.data$J == j, ],
-                      cv.fold = dot.param[["cv.fold"]],
-                      cv.steps = cv.iterations,
-                      hdi.level = hdi.level,
-                      ntree = dot.param[["ntree"]]))
-  }
-  else if(stat.learn.method == "svm") {
-    cas <- (foreach(j = 1:max(genphen.data$J),
-                    .export = c("getSvmCa", "getHdi", "getKappa"), 
-                    .packages = c("e1071")) %dopar% 
-              getSvmCa(genphen.data = genphen.data[genphen.data$J == j, ],
-                       cv.fold = dot.param[["cv.fold"]],
-                       cv.steps = cv.iterations,
-                       hdi.level = hdi.level))
-  }
-  # stop cluster
-  parallel::stopCluster(cl = cl)
-  doParallel::stopImplicitCluster()
+  # # TODO: select model
+  # if(genphen.data$is.bi[1] == TRUE) {
+  #   model.stan <- stanmodels$Ubi
+  #   if(model.type == "hierarchical") {
+  #     model.stan <- stanmodels$Hbi
+  #   }
+  # }
+  # else {
+  #   model.stan <- stanmodels$Umi
+  #   if(model.type == "hierarchical") {
+  #     model.stan <- stanmodels$Hmi
+  #   }
+  # }
+  # 
+  # TODO: should the data be pre-formatted?
+  browser()
+  p <- runBayesianInference(genphen.data = genphen.data,
+                            mcmc.chains = mcmc.chains,
+                            mcmc.steps = mcmc.steps,
+                            mcmc.warmup = mcmc.warmup,
+                            cores = cores,
+                            model.stan = model.stan,
+                            adapt_delta = dot.param$adapt_delta,
+                            max_treedepth = dot.param$max_treedepth,
+                            refresh = dot.param$refresh,
+                            verbose = dot.param$verbose)
+  return (p)
   
   
-  # assemble results - univariate
-  if(model.type == "univariate") {
-    getO <- function(x, y) {
-      return(x[[y]])
-    }
-    getS <- function(x, y) {
-      return(x[[y]])
-    }
-    
-    
-    results <- do.call(rbind, lapply(X = o, FUN = getO, y="statistics.out"))
-    convergence <- do.call(rbind, lapply(X = o, FUN = getO,y="convergence.out"))
-    if(rpa.iterations == 0) {
-      rpa <- NULL
-    }
-    else {
-      rpa <- do.call(rbind, lapply(X = o, FUN = getO, y="rpa.out"))
-    }
-    ppc <- do.call(rbind, lapply(X = o, FUN = getO, y="ppc.out"))
-    cas <- do.call(rbind, cas)
-    stan.obj <- lapply(X = o, FUN = getS, y = "stan.obj")
-  }
+  # TODO: un-comment
+  # cat("======== Statistical Learning ======== \n")
+  # s <- runStatLearn(genphen.data = genphen.data, 
+  #                   method = stat.learn.method,
+  #                   cv.fold = dot.param[["cv.fold"]],
+  #                   cv.steps = cv.steps,
+  #                   ntree = dot.param[["ntree"]],
+  #                   hdi.level = hdi.level,
+  #                   cores = cores,
+  #                   dot.param = dot.param)
+  # return (s)
+  
+  # TODO: needed?
+  # scores <- merge(x = results, y = cas, all = TRUE,
+  #                 by = c("site", "g1", "g0", "n1", "n0"))
   
   
-  # assemble results - hierarchical
-  if(model.type == "hierarchical") {
-    results <- o[["statistics.out"]]
-    convergence <- o[["convergence.out"]]
-    rpa <- o[["rpa.out"]]
-    ppc <- o[["ppc.out"]]
-    cas <- do.call(rbind, cas)
-    stan.obj <- o[["stan.obj"]]
-  }
+  # if(phenotype.type == "continuous") {
+  #   # format scores nicely
+  #   nice.scores <- scores[, c("site", "g1", "g0",
+  #                             "beta.mean", "beta.L", "beta.H", "beta.sd",
+  #                             "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+  #                             "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
+  #                             "nu.mean", "nu.L", "nu.H", "nu.sd",
+  #                             "ca", "ca.L", "ca.H",
+  #                             "kappa", "kappa.L", "kappa.H",
+  #                             "bc")]
+  # }
+  # if(phenotype.type == "dichotomous") {
+  #   # format scores nicely
+  #   nice.scores <- scores[, c("site", "g1", "g0",
+  #                             "beta.mean", "beta.L", "beta.H", "beta.sd",
+  #                             "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
+  #                             "ca", "ca.L", "ca.H",
+  #                             "kappa", "kappa.L", "kappa.H",
+  #                             "bc")]
+  # }
   
   
-  # merge effect sizes and cas
-  scores <- merge(x = results, y = cas, all = TRUE,
-                  by = c("site", "g1", "g0", "n1", "n0"))
-  
-  
-  if(phenotype.type == "continuous") {
-    # format scores nicely
-    nice.scores <- scores[, c("site", "g1", "g0",
-                              "beta.mean", "beta.L", "beta.H", "beta.sd",
-                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-                              "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
-                              "nu.mean", "nu.L", "nu.H", "nu.sd",
-                              "ca", "ca.L", "ca.H",
-                              "kappa", "kappa.L", "kappa.H",
-                              "bc")]
-  }
-  if(phenotype.type == "dichotomous") {
-    # format scores nicely
-    nice.scores <- scores[, c("site", "g1", "g0",
-                              "beta.mean", "beta.L", "beta.H", "beta.sd",
-                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-                              "ca", "ca.L", "ca.H",
-                              "kappa", "kappa.L", "kappa.H",
-                              "bc")]
-  }
-  
-  
-  # order by genotype site
-  nice.scores <- nice.scores[order(nice.scores$site, decreasing = FALSE), ]
-  convergence <- convergence[order(convergence$site, decreasing = FALSE), ]
-  scores <- scores[order(scores$site, decreasing = FALSE), ]
-  if(is.null(rpa) == FALSE) {
-    rpa <- rpa[order(rpa$site, decreasing = FALSE), ]
-  }
-  
-  # return
-  return(list(scores = nice.scores,
-              convergence = convergence,
-              debug.scores = scores,
-              rpa = rpa,
-              ppc = ppc,
-              stan.obj = stan.obj))
+  # # order by genotype site
+  # nice.scores <- nice.scores[order(nice.scores$site, decreasing = FALSE), ]
+  # convergence <- convergence[order(convergence$site, decreasing = FALSE), ]
+  # scores <- scores[order(scores$site, decreasing = FALSE), ]
+  # if(is.null(rpa) == FALSE) {
+  #   rpa <- rpa[order(rpa$site, decreasing = FALSE), ]
+  # }
+  # 
+  # # return
+  # return(list(scores = nice.scores,
+  #             convergence = convergence,
+  #             debug.scores = scores,
+  #             rpa = rpa,
+  #             ppc = ppc,
+  #             stan.obj = stan.obj))
 }
 
 
@@ -281,7 +143,7 @@ runDiagnostics <- function(genotype,
                            phenotype.type,
                            rf.trees = 5000,
                            mcmc.chains = 2,
-                           mcmc.iterations = 2500,
+                           mcmc.steps = 2500,
                            mcmc.warmup = 500,
                            cores = 1,
                            hdi.level = 0.95,
@@ -296,14 +158,12 @@ runDiagnostics <- function(genotype,
              phenotype.type = phenotype.type,
              model.type = "univariate",
              mcmc.chains = mcmc.chains,
-             mcmc.iterations = mcmc.iterations,
+             mcmc.steps = mcmc.steps,
              mcmc.warmup = mcmc.warmup,
              cores = cores,
              hdi.level = hdi.level,
              stat.learn.method = "none",
-             cv.iterations = 0,
-             rpa.iterations = 0,
-             with.stan.obj = FALSE)
+             cv.steps = 0)
   
   
   # check optional (dot) inputs
@@ -417,7 +277,7 @@ runDiagnostics <- function(genotype,
                   .packages = c("rstan"))
           %dopar% runContU(genphen.data = genphen.data[genphen.data$J==Js[j],],
                            mcmc.chains = mcmc.chains,
-                           mcmc.iterations = mcmc.iterations,
+                           mcmc.steps = mcmc.steps,
                            mcmc.warmup = mcmc.warmup,
                            cores = 1,
                            hdi.level = hdi.level,
@@ -437,7 +297,7 @@ runDiagnostics <- function(genotype,
                   .packages = c("rstan"))
           %dopar% runDichU(genphen.data = genphen.data[genphen.data$J==Js[j],],
                            mcmc.chains = mcmc.chains,
-                           mcmc.iterations = mcmc.iterations,
+                           mcmc.steps = mcmc.steps,
                            mcmc.warmup = mcmc.warmup,
                            cores = 1,
                            hdi.level = hdi.level,
