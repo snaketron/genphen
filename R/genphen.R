@@ -46,26 +46,21 @@ runGenphen <- function(genotype,
     stop("No genphen input data found.")
   }
   
-  # model.stan <- umi
-  model.stan <- hmi
+  
+  # select model
+  if(model.type == "hierarchical") {
+    model.stan <- hmi
+    # TODO: change to
+    # model.stan <- stanmodels$H
+  }
+  if(model.type == "univariate") {
+    model.stan <- umi
+    # TODO: change to
+    # model.stan <- stanmodels$U
+  }
   
   
-  # # TODO: select model
-  # if(genphen.data$is.bi[1] == TRUE) {
-  #   model.stan <- stanmodels$Ubi
-  #   if(model.type == "hierarchical") {
-  #     model.stan <- stanmodels$Hbi
-  #   }
-  # }
-  # else {
-  #   model.stan <- stanmodels$Umi
-  #   if(model.type == "hierarchical") {
-  #     model.stan <- stanmodels$Hmi
-  #   }
-  # }
-  # 
-  # TODO: should the data be pre-formatted?
-  browser()
+  cat("======== Bayesian Inference ======== \n")
   p <- runBayesianInference(genphen.data = genphen.data,
                             mcmc.chains = mcmc.chains,
                             mcmc.steps = mcmc.steps,
@@ -76,279 +71,84 @@ runGenphen <- function(genotype,
                             max_treedepth = dot.param$max_treedepth,
                             refresh = dot.param$refresh,
                             verbose = dot.param$verbose)
-  return (p)
   
   
-  # TODO: un-comment
-  # cat("======== Statistical Learning ======== \n")
-  # s <- runStatLearn(genphen.data = genphen.data, 
-  #                   method = stat.learn.method,
-  #                   cv.fold = dot.param[["cv.fold"]],
-  #                   cv.steps = cv.steps,
-  #                   ntree = dot.param[["ntree"]],
-  #                   hdi.level = hdi.level,
-  #                   cores = cores,
-  #                   dot.param = dot.param)
-  # return (s)
-  
-  # TODO: needed?
-  # scores <- merge(x = results, y = cas, all = TRUE,
-  #                 by = c("site", "g1", "g0", "n1", "n0"))
+  cat("======== Statistical Learning ======== \n")
+  s <- runStatLearn(genphen.data = genphen.data,
+                    method = stat.learn.method,
+                    cv.fold = dot.param[["cv.fold"]],
+                    cv.steps = cv.steps,
+                    ntree = dot.param[["ntree"]],
+                    hdi.level = hdi.level,
+                    cores = cores,
+                    dot.param = dot.param)
   
   
-  # if(phenotype.type == "continuous") {
-  #   # format scores nicely
-  #   nice.scores <- scores[, c("site", "g1", "g0",
-  #                             "beta.mean", "beta.L", "beta.H", "beta.sd",
-  #                             "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-  #                             "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
-  #                             "nu.mean", "nu.L", "nu.H", "nu.sd",
-  #                             "ca", "ca.L", "ca.H",
-  #                             "kappa", "kappa.L", "kappa.H",
-  #                             "bc")]
-  # }
-  # if(phenotype.type == "dichotomous") {
-  #   # format scores nicely
-  #   nice.scores <- scores[, c("site", "g1", "g0",
-  #                             "beta.mean", "beta.L", "beta.H", "beta.sd",
-  #                             "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-  #                             "ca", "ca.L", "ca.H",
-  #                             "kappa", "kappa.L", "kappa.H",
-  #                             "bc")]
-  # }
+  o <- getScores(p = p, s = s, 
+                 hdi.level = hdi.level, 
+                 genphen.data = genphen.data)
   
   
-  # # order by genotype site
-  # nice.scores <- nice.scores[order(nice.scores$site, decreasing = FALSE), ]
-  # convergence <- convergence[order(convergence$site, decreasing = FALSE), ]
-  # scores <- scores[order(scores$site, decreasing = FALSE), ]
-  # if(is.null(rpa) == FALSE) {
-  #   rpa <- rpa[order(rpa$site, decreasing = FALSE), ]
-  # }
-  # 
-  # # return
-  # return(list(scores = nice.scores,
-  #             convergence = convergence,
-  #             debug.scores = scores,
-  #             rpa = rpa,
-  #             ppc = ppc,
-  #             stan.obj = stan.obj))
+  
+  # format scores
+  o <- do.call(rbind, o)
+  o <- o[, c("site", "ref", "alt", "refN", "altN", "p", "mean", 
+             "se_mean", "sd", "X2.5.", "X97.5.", "n_eff", "Rhat", 
+             "ca", "ca.L", "ca.H", "k", "k.L", "k.H")]
+  colnames(o) <- c("site", "ref", "alt", "refN", "altN", "phenotype.id", 
+                   "beta.mean", "beta.se", "beta.sd", "beta.hdi.low", 
+                   "beta.hdi.high", "Neff", "Rhat", 
+                   "ca.mean", "ca.hdi.low", "ca.hdi.high", 
+                   "kappa.mean", "kappa.hdi.low", "kappa.hdi.high")
+  
+  return (list(scores = o, complete.posterior = p$posterior))
 }
 
 
 
-
+# Description:
+# Compute importance of each genotype
 runDiagnostics <- function(genotype,
                            phenotype,
                            phenotype.type,
-                           rf.trees = 5000,
-                           mcmc.chains = 2,
-                           mcmc.steps = 2500,
-                           mcmc.warmup = 500,
-                           cores = 1,
-                           hdi.level = 0.95,
-                           diagnostic.points,
-                           ...) {
-  
-  
-  
-  # check inputs
-  checkInput(genotype = genotype,
-             phenotype = phenotype,
-             phenotype.type = phenotype.type,
-             model.type = "univariate",
-             mcmc.chains = mcmc.chains,
-             mcmc.steps = mcmc.steps,
-             mcmc.warmup = mcmc.warmup,
-             cores = cores,
-             hdi.level = hdi.level,
-             stat.learn.method = "none",
-             cv.steps = 0)
-  
-  
-  # check optional (dot) inputs
-  dot.param <- checkDotParameters(...)
-  
-  
-  # convert AAMultipleAlignment to matrix if needed
-  genotype <- convertMsaToGenotype(genotype = genotype)
-  
-  
-  # if vector genotype => matrix genotype
-  if(is.vector(genotype)) {
-    genotype <- matrix(data = genotype, ncol = 1)
-  }
+                           rf.trees = 5000) {
   
   
   # check input diagnostics
-  checkInputDiagnostics(genotype = genotype,
-                        diagnostic.points = diagnostic.points,
-                        rf.trees = rf.trees)
+  checkDiagnosticInput(genotype = genotype, 
+                       phenotype = phenotype, 
+                       phenotype.type = phenotype.type, 
+                       rf.trees = rf.trees)
   
   
-  # find importances: prepare for ranger
-  rf.data <- data.frame(genotype)
-  if(phenotype.type == "continuous") {
-    rf.data$phenotype <- phenotype
-  }
-  if(phenotype.type == "dichotomous") {
-    rf.data$phenotype <- as.factor(phenotype)
+  # convert input data to stan data
+  genphen.data <- getStanData(genotype = genotype,
+                              phenotype = phenotype,
+                              phenotype.type = phenotype.type)
+  
+  
+  # create genphen data
+  rf.data <- as.data.frame(genphen.data$gmap)
+  rf.data$Y <- genphen.data$Y[, 1]
+  if(phenotype.type == "D") {
+    rf.data$Y <- as.factor(rf.data$Y)
   }
   
   
   # ranger: importance dataset
   cat("======== RF diagnostics ======== \n")
-  rf.out <- ranger::ranger(dependent.variable.name = "phenotype",
+  rf.out <- ranger::ranger(dependent.variable.name = "Y",
                            importance = "impurity",
                            data = rf.data, 
                            num.trees = rf.trees)
+  
+  
   rf.out <- data.frame(site = 1:length(rf.out$variable.importance),
                        importance = rf.out$variable.importance,
                        stringsAsFactors = FALSE)
-  rf.out <- rf.out[order(rf.out$importance, decreasing = TRUE), ]
-  rf.out$importance.rank <- 1:nrow(rf.out)
   
   
-  
-  # if diagnostic points are not provided, return the RF scores
-  if(is.null(diagnostic.points) == TRUE ||
-     length(diagnostic.points) == 0 ||
-     is.na(diagnostic.points) == TRUE) {
-    cat("No diagnostic points provided, only importance analysis performed.\n")
-    return(list(scores = NA, 
-                importance.scores = rf.out))
-  }
-  
-  
-  
-  # genphen.data and final check for input
-  genphen.data <- getGenphenData(genotype = genotype,
-                                 phenotype = phenotype,
-                                 cores = cores)
-  
-  
-  if(is.null(genphen.data)) {
-    stop("No genphen input data found with these diagnostic points.")
-  }
-  
-  # in case of duplicate diagnostic points
-  diagnostic.points <- unique(diagnostic.points)
-  # actual anchor points
-  anchors <- data.frame(real.anchors = rf.out$site[diagnostic.points],
-                        diagnostic.points = diagnostic.points,
-                        stringsAsFactors = FALSE)
-  # check if given anchor points are too conserved to be used for the analysis
-  anchors$miss <- ifelse(test = !anchors$real.anchors %in% genphen.data$S,
-                         yes = TRUE, no = FALSE)
-  if(sum(anchors$miss) != 0) {
-    warning(paste(sum(anchors$miss), " anchor points are conserved, cannot be ",
-                  "analyzed: ", paste(anchors$real.anchors[anchors$miss==TRUE], 
-                                      collapse = ','), sep =''))
-  }
-  
-  
-  # final genphen data
-  real.anchors <- anchors$real.anchors[anchors$miss == FALSE]
-  genphen.data <- genphen.data[genphen.data$S %in% real.anchors, ]
-  if(is.null(genphen.data)) {
-    stop("No genphen input data found with these anchor points.")
-  }
-  genphen.data <- merge(x = genphen.data, y = anchors,
-                        by.x = "S", by.y = "real.anchors")
-  
-  
-  # compile model
-  cat("======== Compiling Diagnostic Model ======== \n")
-  # model.stan <- compileModel(phenotype.type = phenotype.type, 
-  #                            model.type = "univariate")
-  
-  
-  cat("======== Main Analysis Running ======== \n")
-  # register parallel
-  cl <- parallel::makeCluster(cores)
-  doParallel::registerDoParallel(cl)
-  Js <- unique(genphen.data$J)
-  j <- NULL
-  
-  if(phenotype.type == "continuous") {
-    o <- (foreach(j = 1:length(Js),
-                  .export = c("runContU", "getHdi", "getGenphenData",
-                              "getBhattacharyya", "getRpaCont"), 
-                  .packages = c("rstan"))
-          %dopar% runContU(genphen.data = genphen.data[genphen.data$J==Js[j],],
-                           mcmc.chains = mcmc.chains,
-                           mcmc.steps = mcmc.steps,
-                           mcmc.warmup = mcmc.warmup,
-                           cores = 1,
-                           hdi.level = hdi.level,
-                           model.stan = stanmodels$cont_univ,
-                           rpa.iterations = 0,
-                           with.stan.obj = FALSE,
-                           adapt_delta = dot.param$adapt_delta,
-                           max_treedepth = dot.param$max_treedepth,
-                           rpa.significant = dot.param$rpa.significant,
-                           refresh = dot.param$refresh,
-                           verbose = dot.param$verbose))
-  }
-  else if(phenotype.type == "dichotomous") {
-    o <- (foreach(j = 1:length(Js),
-                  .export = c("runDichU", "getHdi", "getGenphenData",
-                              "getBhattacharyya", "getRpaDich"), 
-                  .packages = c("rstan"))
-          %dopar% runDichU(genphen.data = genphen.data[genphen.data$J==Js[j],],
-                           mcmc.chains = mcmc.chains,
-                           mcmc.steps = mcmc.steps,
-                           mcmc.warmup = mcmc.warmup,
-                           cores = 1,
-                           hdi.level = hdi.level,
-                           model.stan = stanmodels$dich_univ,
-                           rpa.iterations = 0,
-                           with.stan.obj = FALSE,
-                           adapt_delta = dot.param$adapt_delta,
-                           max_treedepth = dot.param$max_treedepth,
-                           rpa.significant = dot.param$rpa.significant,
-                           refresh = dot.param$refresh,
-                           verbose = dot.param$verbose))
-  }
-  # stop cluster
-  parallel::stopCluster(cl = cl)
-  doParallel::stopImplicitCluster()
-  
-  
-  # assemble results - univariate
-  getO <- function(x, y) {
-    return(x[[y]])
-  }
-  scores <- do.call(rbind, lapply(X = o, FUN = getO, y="statistics.out"))
-  
-  
-  # merge
-  scores <- merge(x = scores, 
-                  y = anchors[, c("real.anchors", "diagnostic.points")], 
-                  by.x = "site", by.y = "real.anchors", all.x = TRUE)
-  
-  
-  
-  if(phenotype.type == "continuous") {
-    # format scores nicely
-    nice.scores <- scores[, c("site", "g1", "g0",
-                              "beta.mean", "beta.L", "beta.H", "beta.sd",
-                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-                              "sigma.mean", "sigma.L", "sigma.H", "sigma.sd",
-                              "nu.mean", "nu.L", "nu.H", "nu.sd",
-                              "bc", "diagnostic.points")]
-  }
-  if(phenotype.type == "dichotomous") {
-    # format scores nicely
-    nice.scores <- scores[, c("site", "g1", "g0",
-                              "beta.mean", "beta.L", "beta.H", "beta.sd",
-                              "alpha.mean", "alpha.L", "alpha.H", "alpha.sd",
-                              "bc", "diagnostic.points")]
-  }
-  
-  
-  return(list(scores = nice.scores, 
-              importance.scores = rf.out))
+  return (rf.out)
 }
 
 

@@ -3,7 +3,7 @@ Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes with Bayesian inference and statistical learning
 Version: 1.11.14
-Date: 2019-02-20
+Date: 2019-03-02
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
 Description: Genetic association studies are an essential tool for studying 

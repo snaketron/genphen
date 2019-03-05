@@ -1,171 +1,4 @@
 
-# Description:
-# Parse input data and format it for stan and statistical learning
-getStanDataBackup <- function(genotype, 
-                              phenotype, 
-                              phenotype.type) {
-  
-  
-  # Description:
-  # Returns TRUE if the genotype data is composed of at most two-alleles 
-  # at each SNP.
-  isBiallelic <- function(genotype) {
-    
-    isBi <- function(x) {
-      return(length(unique(x)) <= 2)
-    }
-    
-    is.bi <- apply(X = genotype, MARGIN = 2, FUN = isBi)
-    
-    return(all(is.bi == TRUE))
-  }
-  
-  
-  # Description:
-  # Get genotype-phenotype data
-  getFormattedGenphen <- function(genotype, 
-                                  phenotype, 
-                                  phenotype.type) {
-    
-    
-    # convert AAMultipleAlignment to matrix if needed
-    genotype <- convertMsaToGenotype(genotype = genotype)
-    
-    
-    # if vector genotype => matrix genotype
-    if(is.vector(genotype)) {
-      genotype <- matrix(data = genotype, ncol = 1)
-    }
-    
-    
-    # map the groups (genotypes) at each SNP to a number
-    genotype.map <- matrix(data = 0, nrow = nrow(genotype),
-                           ncol = ncol(genotype))
-    for(i in 1:ncol(genotype)) {
-      genotype.map[, i] <- as.numeric(as.factor(genotype[, i]))
-    }
-    
-    
-    
-    # if vector genotype => matrix genotype
-    if(is.vector(phenotype)) {
-      phenotype <- matrix(data = phenotype, ncol = 1)
-    }
-    phenotype <- data.frame(phenotype)
-    
-    
-    # TODO: check
-    if(sum(phenotype.type == "D") != 0) {
-      d <- which(phenotype.type == "D")
-      for(i in 1:length(d)) {
-        if(all(phenotype[, d] %in% c(1, 0)) == FALSE) {
-          # mapping 1st element to 1, 2nd to 0
-          u <- unique(phenotype[, d])
-          phenotype[phenotype[, d] == u[1], d] <- "1"
-          phenotype[phenotype[, d] == u[2], d] <- "0"
-          cat("Mapping dichotomous phenotype:", i, 
-              "(", u[1], "->1,", u[2], "->0) \n")
-        }
-        phenotype[, d] <- as.factor(as.character(phenotype[, d]))
-      }
-    }
-    
-    # return
-    return (list(genotype = genotype, 
-                 genotype.map = genotype.map,
-                 phenotype = phenotype,
-                 phenotype.type = phenotype.type))
-  }
-  
-  
-  # Description:
-  # Convert genphen data to stan data
-  getStanFormat <- function(f.data, 
-                            is.bi) {
-    
-    # set flag
-    f.data$is.bi <- TRUE
-    
-    if(is.bi == TRUE) {
-      X <- f.data$genotype.map
-      X[X == 2] <- -1
-      f.data$Y <- f.data$phenotype
-      f.data$X <- X
-      
-      f.data$Y <- f.data$phenotype
-      f.data$Ns <- ncol(f.data$X)
-      f.data$Ntq <- sum(f.data$phenotype.type == "Q")
-      f.data$Ntd <- sum(f.data$phenotype.type == "D")
-      f.data$N <- nrow(X)
-      
-      if(sum(phenotype.type == "Q") != 0) {
-        f.data$Yq <- f.data$Y[, f.data$phenotype.type == "Q"]
-      }
-      if(sum(phenotype.type == "D") != 0) {
-        f.data$Yd <- f.data$Y[, f.data$phenotype.type == "D"]
-      }
-      
-      return (f.data)
-    }
-    else {
-      X <- f.data$genotype.map
-      if(ncol(X) > 1) {
-        for(i in 2:ncol(X)) {
-          X[, i] <- max(X[, (i-1)]) + X[, i]
-        }
-      }
-      f.data$X <- X
-      f.data$Y <- f.data$phenotype
-      f.data$Ns <- ncol(f.data$X)
-      f.data$Ntq <- sum(f.data$phenotype.type == "Q")
-      f.data$Ntd <- sum(f.data$phenotype.type == "D")
-      M <- data.frame(sk = as.vector(X), s = rep(x = 1:ncol(X), each = nrow(X)))
-      M <- M[duplicated(M) == F, ]
-      f.data$Ms <- M$s
-      f.data$Msk <- M$sk
-      f.data$Nsk <- max(M$sk)
-      f.data$N <- nrow(X)
-      
-      if(sum(phenotype.type == "Q") != 0) {
-        f.data$Yq <- as.matrix(f.data$Y[, f.data$phenotype.type == "Q"])
-      }
-      else {
-        f.data$Yq <- matrix(data = 0, ncol = 0, nrow = f.data$N)
-      }
-      
-      
-      if(sum(phenotype.type == "D") != 0) {
-        f.data$Yd <- as.matrix(f.data$Y[, f.data$phenotype.type == "D"])
-      }
-      else {
-        f.data$Yd <- matrix(data = 0, ncol = 0, nrow = f.data$N)
-      }
-      return (f.data)
-    }
-  }
-  
-  
-  
-  # genphen data
-  f.data <- getFormattedGenphen(genotype = genotype, 
-                                phenotype = phenotype, 
-                                phenotype.type = phenotype.type)
-  
-  
-  # stan data
-  stan.data <- getStanFormat(f.data = f.data, 
-                             is.bi = isBiallelic(f.data$genotype.map))
-  
-  
-  
-  
-  
-  # return
-  return (stan.data)
-}
-
-
-
 
 
 # Description:
@@ -191,7 +24,6 @@ getStanData <- function(genotype,
   }
   
   
-  
   # Description:
   # Get genotype-phenotype data
   getFormattedGenphen <- function(genotype, 
@@ -210,10 +42,14 @@ getStanData <- function(genotype,
     
     
     # map the groups (genotypes) at each SNP to a number
-    genotype.map <- matrix(data = 0, nrow = nrow(genotype),
-                           ncol = ncol(genotype))
+    gmap <- as.data.frame(matrix(data = 0, 
+                                 nrow = nrow(genotype), 
+                                 ncol = ncol(genotype)))
+    max.i <- 0
     for(i in 1:ncol(genotype)) {
-      genotype.map[, i] <- as.numeric(as.factor(genotype[, i]))
+      gmap[, i] <- as.numeric(as.factor(genotype[, i]))+max.i
+      max.i <- max(gmap[, i])
+      gmap[, i] <- as.factor(gmap[, i])
     }
     
     
@@ -242,11 +78,10 @@ getStanData <- function(genotype,
     
     # return
     return (list(genotype = genotype, 
-                 genotype.map = genotype.map,
+                 gmap = gmap,
                  phenotype = phenotype,
                  phenotype.type = phenotype.type))
   }
-  
   
   
   # Description:
@@ -259,7 +94,7 @@ getStanData <- function(genotype,
     getSplitX <- function(x) {
       ux <- unique(x)
       ns <- length(ux)
-      nc <- choose(n = ns, k = 2)
+      nc <- max(c(choose(n = ns, k = 2), 1))
       x.split <- matrix(data = 0, nrow = length(x), ncol = nc)
       
       if(ns == 1) {
@@ -303,7 +138,6 @@ getStanData <- function(genotype,
     }
     
     
-    
     # make huge matrix with predictors
     X <- f.data$genotype
     colnames(X) <- 1:ncol(X)
@@ -313,6 +147,19 @@ getStanData <- function(genotype,
     }
     X <- do.call(cbind, lapply(X = x.data, FUN = getXData))
     x.map <- do.call(rbind, lapply(X = x.data, FUN = getXMap))
+    
+    
+    # filtering
+    filter.i <- which(x.map$refN > 1 & x.map$altN > 1)
+    X <- X[, filter.i]
+    if(length(X) == 0) {
+      stop("All SNPs have 1 element (Problem)")
+    }
+    if(is.vector(X) == T) {
+      X <- matrix(data = X, ncol = 1)
+    }
+    x.map <- x.map[filter.i, ]
+    
     
     if(sum(phenotype.type == "Q") != 0) {
       Yq <- as.matrix(f.data$phenotype[, f.data$phenotype.type == "Q"])
@@ -338,11 +185,11 @@ getStanData <- function(genotype,
               Ntq = ncol(Yq),
               Ntd = ncol(Yd),
               is.bi = is.bi,
-              xmap = x.map)
+              xmap = x.map,
+              gmap = f.data$gmap)
     
     return (s)
   }
-  
   
   
   # genphen data
@@ -353,8 +200,7 @@ getStanData <- function(genotype,
   
   # stan data
   stan.data <- getStanFormat(f.data = f.data, 
-                             is.bi = isBiallelic(f.data$genotype.map))
-  
+                             is.bi = isBiallelic(f.data$gmap))
   
   
   # return
@@ -368,16 +214,6 @@ getStanData <- function(genotype,
 # Description:
 # Check the optional (...) parameters, if provided.
 checkDotParameters <- function(...) {
-  
-  checkRpaSignificant <- function(rpa.significant) {
-    if(length(rpa.significant) != 1) {
-      stop("rpa.significant must be logical (TRUE/FALSE).")
-    }
-    
-    if(is.logical(rpa.significant) == FALSE) {
-      stop("rpa.significant must be logical.")
-    }
-  }
   
   checkAdaptDelta <- function(adapt_delta) {
     if(length(adapt_delta) != 1) {
@@ -461,14 +297,12 @@ checkDotParameters <- function(...) {
                        "max_treedepth", 
                        "ntree", 
                        "cv.fold", 
-                       "rpa.significant",
                        "refresh",
                        "verbose")
-  default.values <- list(adapt_delta = 0.9, 
+  default.values <- list(adapt_delta = 0.8, 
                          max_treedepth = 10,
                          ntree = 1000, 
                          cv.fold = 0.66, 
-                         rpa.significant = TRUE,
                          refresh = 250,
                          verbose = TRUE)
   
@@ -491,10 +325,6 @@ checkDotParameters <- function(...) {
     if(p == "adapt_delta") {
       checkAdaptDelta(adapt_delta = list(...)[[p]])
       default.values[["adapt_delta"]] <- list(...)[[p]]
-    }
-    if(p == "rpa.significant") {
-      checkRpaSignificant(rpa.significant = list(...)[[p]])
-      default.values[["rpa.significant"]] <- list(...)[[p]]
     }
     if(p == "max_treedepth") {
       checkMaxTreedepth(max_treedepth = list(...)[[p]])
@@ -818,45 +648,160 @@ checkInput <- function(genotype,
 # Description:
 # Provided the input arguments, this function checks their validity. It
 # stops the execution if a problem is encountered and prints out warnings.
-checkInputDiagnostics <- function(genotype, 
-                                  diagnostic.points, 
-                                  rf.trees){
+checkDiagnosticInput <- function(genotype, 
+                                 phenotype, 
+                                 phenotype.type, 
+                                 rf.trees) {
   
-  checkDiagnosticPoints <- function(diagnostic.points, rf.trees) {
+  checkGenotypePhenotype <- function(genotype, phenotype, phenotype.type) {
+    # CHECK: genotype
+    if(is.null(attr(genotype, "class")) == FALSE) {
+      if(!attr(genotype, "class") %in% c("AAMultipleAlignment",
+                                         "DNAMultipleAlignment")) {
+        stop("genotype can be one of the following structures: vector (for a 
+             single SNP), matrix, data.frame or Biostrings structures such as
+             DNAMultipleAlignment or AAMultipleAlignment")
+      }
+      else {
+        temp <- as.matrix(genotype)
+        if(nrow(temp) < 2 | ncol(temp) == 0) {
+          stop("The genotypes cannot have less than two observations, or the
+               number of genotypes cannot be 0.")
+        }
+      }
+    }
+    else {
+      if(is.vector(genotype)) {
+        genotype <- matrix(data = genotype, ncol = 1)
+      }
+      
+      if(nrow(genotype) < 2 | ncol(genotype) == 0) {
+        stop("The genotypes cannot have less than two observations or the
+             number of genotypes cannot be 0.")
+      }
+      
+      if(!is.matrix(genotype) & !is.data.frame(genotype)) {
+        stop("genotype can be one of the following structures: vector (for a 
+             single SNP), matrix, data.frame or Biostrings structures such as
+             DNAMultipleAlignment or AAMultipleAlignment")
+      }
+      
+      if(typeof(genotype) != "character") {
+        stop("If it is structured as vector/matrix/data.frame, 
+             the genotype have be of character type.")
+      }
+    }
+    
+    # CHECK: phenotype
+    if(!is.vector(phenotype)) {
+      stop("The phenotype must be a vector (single phenotype), 
+           where each element corresponds to each individual")
+    }
+    
+    # convert vector -> matrix 
+    if(is.vector(phenotype) == TRUE) {
+      phenotype <- matrix(data = phenotype, ncol = 1)
+    }
+    
+    if(!is.numeric(phenotype)) {
+      stop("The phenotype must be of numeric type.")
+    }
+    
+    if(length(phenotype) < 3) {
+      stop("The phenotype must contain at least 3 data points.")
+    }
+    
+    if(nrow(genotype) != nrow(phenotype)) {
+      stop("length(genotype) != length(phenotype),
+           they must be equal in length.")
+    }
+    
+    
+    
+    # CHECK: phenotype.type 
+    if(is.vector(phenotype.type) == FALSE) {
+      stop("phenotype.type must be vector. Each element in this vector refers 
+           to the type of each phenotype, with 'Q' (for quantitative phenotypes) 
+           or 'D' (for dichotomous) included as each columns in the phenotype 
+           data. If a single phenotype is provided, then the phenotype type 
+           should be a single 'Q' or 'D'.")
+    }
+    
+    if(length(phenotype.type) == 0) {
+      stop("The phenotype.type vector must contain at least 1 element.")
+    }
+    
+    if(typeof(phenotype.type) != "character") {
+      stop("phenotype.type must be character vector with elements 'Q' (for 
+           quantitative phenotypes) or 'D' (for dichotomous)")
+    }
+    
+    if(ncol(phenotype) != 1) {
+      stop("The diagnosis can be done using single phenotypes.")
+    }
+    
+    if(ncol(phenotype) != length(phenotype.type)) {
+      stop("Number of phenotypes provided differs from phenotypes types.")
+    }
+    
+    if(all(phenotype.type %in% c("Q", "D")) == FALSE) {
+      stop("phenotype.type must be character vector with elements 'Q' (for 
+           quantitative phenotypes) or 'D' (for dichotomous)")
+    }
+  }
+  
+  checkPhenotypeValidity <- function(phenotype, phenotype.type) {
+    
+    # convert vector -> matrix 
+    if(is.vector(phenotype) == TRUE) {
+      phenotype <- matrix(data = phenotype, ncol = 1)
+    }
+    
+    # check phenotype types
+    for(i in 1:length(phenotype.type)) {
+      if(phenotype.type[i] == "D") {
+        if(length(unique(phenotype[, i])) != 2) {
+          stop("The dichotomous phenotypes must contains exactly two 
+               categories (classes) \n")
+        }
+      }
+      if(phenotype.type[i] == "Q") {
+        if(length(unique(phenotype[, i])) <= 3) {
+          warning("The quantitative phenotype/s contains 3 or less unique 
+                  elements \n")
+        }
+      }
+    }
+  }
+  
+  checkRfTrees <- function(rf.trees) {
     
     if(length(rf.trees) != 1) {
-      stop("diagnostics.samples must be a number (default = 5,000).")
+      stop("rf.trees must be a number (default = 5,000).")
     }
     
     if(is.numeric(rf.trees) == FALSE) {
       stop("rf.trees must be a number (default = 5,000).")
     }
     
-    if(rf.trees < 1000) {
+    if(rf.trees < 5000) {
       stop("rf.trees >= 1,000 accepted (default = 5,000).")
     }
   }
   
-  if(is.null(diagnostic.points) | missing(diagnostic.points) | 
+  if(is.null(genotype) | missing(genotype) |
+     is.null(phenotype) | missing(phenotype) |
+     is.null(phenotype.type) | missing(phenotype.type) |
      is.null(rf.trees) | missing(rf.trees)) {
     stop("arguments must be non-NULL/specified")
   }
   
-  checkDiagnosticPoints(diagnostic.points = diagnostic.points, 
-                        rf.trees = rf.trees)
-  
-  
-  if(length(diagnostic.points) > 0) {
-    if(is.numeric(diagnostic.points) == FALSE) {
-      stop("diagnostic.points must be a numeric vector.")
-    }
-    else {
-      if(all(diagnostic.points %in% 1:ncol(genotype)) == FALSE) {
-        stop("The diagnostic points must lie in the genotype space:",
-             "[", 1, "-", ncol(genotype), "] \n", sep = '')
-      }
-    }
-  }
+  checkGenotypePhenotype(genotype = genotype, 
+                         phenotype = phenotype, 
+                         phenotype.type = phenotype.type)
+  checkPhenotypeValidity(phenotype = phenotype, 
+                         phenotype.type = phenotype.type)
+  checkRfTrees(rf.trees = rf.trees)
 }
 
 
@@ -971,6 +916,93 @@ runStatLearn <- function(genphen.data,
     getBoot <- function(D, cv.fold, cv.steps, ntree, hdi.level) {
       
       # posterior output (one extra for multi-trait)
+      posterior <- vector(mode = "list", length = ncol(D)-1)
+      for(i in 1:length(posterior)) {
+        posterior[[i]] <- matrix(data = NA, nrow = cv.steps, ncol = 2)
+      }
+      rm(i)
+      
+      
+      D$Y <- as.character(D$Y)
+      for(i in 1:cv.steps) {
+        # sample at random
+        s <- sample(x = 1:nrow(D), size = ceiling(x = cv.fold*nrow(D)), 
+                    replace = FALSE)
+        train <- D[s, ]
+        test <- D[-s, ]
+        
+        
+        # TODO: dummy (check if inference needed at all e.g. 1 class only)
+        if(length(unique(train$Y)) == 1) {
+          for(j in 1:length(posterior)) {
+            posterior[[j]][i, ] <- c(NA, NA)
+          }
+        }
+        else {
+          for(j in 1:length(posterior)) {
+            
+            # train classification model (try condition to avoid errors in 
+            # case only one-level predictor is train data)
+            rf.out <- try(ranger::ranger(Y~., data = train[, c(1, j+1)],
+                                         num.trees = ntree), silent = TRUE)
+            
+            if(class(rf.out) == "try-error") {
+              posterior[[j]][i, 1:2] <- c(NA, NA)
+            }
+            else {
+              # test classification model
+              pr <- stats::predict(object = rf.out, data = test)
+              
+              
+              # compute classification accuracy (1 - classification error)
+              test$Y <- as.character(test$Y)
+              pr$predictions <- as.character(pr$predictions)
+              ca <- sum(test$Y == pr$predictions)/nrow(test)
+              
+              
+              # compute k statistics
+              k <- getKappa(real = test$Y, 
+                            predicted = pr$predictions, 
+                            aas = unique(D$Y))
+              
+              posterior[[j]][i, 1:2] <- c(ca, k)
+            }
+          }
+        }
+      }
+      
+      # compute stats
+      summary <- c()
+      for(j in 1:length(posterior)) {
+        ca <- posterior[[j]][, 1]
+        ca <- ca[is.finite(ca)]
+        ca.mean <- mean(x = ca)
+        # get HDI
+        ca.hdi <- getHdi(vec = posterior[[j]][,1], hdi.level = hdi.level)
+        ca.L <- as.numeric(ca.hdi[1])
+        ca.H <- as.numeric(ca.hdi[2])
+        
+        k <- posterior[[j]][, 2]
+        k <- k[is.finite(k)]
+        k.mean <- mean(x = k)
+        # get HDI
+        k.hdi <- getHdi(vec = posterior[[j]][, 2], hdi.level = hdi.level)
+        k.L <- as.numeric(k.hdi[1])
+        k.H <- as.numeric(k.hdi[2])
+        
+        # summary append
+        row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
+                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
+        summary <- rbind(summary, row)
+      }
+      
+      return (summary)
+    }
+    
+    
+    getBootBackup <- function(D, cv.fold, cv.steps, ntree, hdi.level) {
+      
+      # posterior output (one extra for multi-trait)
       if(ncol(D) > 2) {
         posterior <- vector(mode = "list", length = ncol(D))
       }
@@ -1060,7 +1092,7 @@ runStatLearn <- function(genphen.data,
         
         # summary append
         row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
-                          k = k.mean, k.L = k.L, k.H = k.H, i = j)
+                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
         summary <- rbind(summary, row)
       }
       
@@ -1068,62 +1100,32 @@ runStatLearn <- function(genphen.data,
     }
     
     
-    gs <- sort(unique(X), decreasing = T)
+    
+    i <- which(X %in% c(1, -1))
+    D <- data.frame(Y = as.character(X))
+    colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
+    D <- cbind(D, Y)
+    D <- D[i, ]
+    
+    
+    # if c.v. can be done with given cv.fold and # of data points
     result <- c()
-    if(length(gs) == 1) {
-      D <- data.frame(Y = X)
-      D <- cbind(D, Y)
-      
+    if(ceiling(cv.fold*nrow(D)) == nrow(D)) {
       for(i in 1:ncol(Y)) {
         out <- data.frame(ca = NA, ca.L = NA, ca.H = NA,
                           k = NA, k.L = NA, k.H = NA,
-                          i = i, ref = gs, alt = NA, 
-                          refN = nrow(D), altN = NA, 
-                          site = site, stringsAsFactors = FALSE)
+                          p = i, stringsAsFactors = FALSE)
         result <- rbind(result, out)
       }
     }
     else {
-      for(gi in 1:(length(gs)-1)) {
-        for(gj in (gi+1):length(gs)) {
-          
-          i <- which(X %in% c(gs[gi], gs[gj]))
-          D <- data.frame(Y = X)
-          colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
-          D <- cbind(D, Y)
-          D <- D[i, ]
-          
-          
-          # if c.v. can be done with given cv.fold and # of data points
-          if(ceiling(cv.fold*nrow(D)) == nrow(D)) {
-            for(i in 1:ncol(Y)) {
-              out <- data.frame(ca = NA, ca.L = NA, ca.H = NA,
-                                k = NA, k.L = NA, k.H = NA,
-                                i = i, ref = gs[gi], alt = gs[gj], 
-                                refN = sum(X == gs[gi]), 
-                                altN = sum(X == gs[gj]), 
-                                site = site, stringsAsFactors = FALSE)
-              result <- rbind(result, out)
-            }
-          }
-          else {
-            # run
-            p <- getBoot(D = D, 
-                         cv.fold = cv.fold, 
-                         cv.steps = cv.steps, 
-                         hdi.level = hdi.level,
-                         ntree = ntree)
-            
-            # summarize
-            p$ref <- gs[gi]
-            p$alt <- gs[gj]
-            p$refN = sum(X == gs[gi])
-            p$altN = sum(X == gs[gj])
-            p$site = site
-            result <- rbind(result, p)
-          }
-        }
-      }
+      # run
+      p <- getBoot(D = D, 
+                   cv.fold = cv.fold, 
+                   cv.steps = cv.steps, 
+                   hdi.level = hdi.level,
+                   ntree = ntree)
+      result <- rbind(result, p)
     }
     return (result)
   }
@@ -1134,7 +1136,7 @@ runStatLearn <- function(genphen.data,
                      hdi.level, site) {
     
     
-    getBoot <- function(D, cv.fold, cv.steps, hdi.level) {
+    getBootBackup <- function(D, cv.fold, cv.steps, hdi.level) {
       
       # posterior output (one extra for multi-trait)
       if(ncol(D) > 2) {
@@ -1227,7 +1229,7 @@ runStatLearn <- function(genphen.data,
         
         # summary append
         row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
-                          k = k.mean, k.L = k.L, k.H = k.H, i = j)
+                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
         summary <- rbind(summary, row)
       }
       
@@ -1235,62 +1237,119 @@ runStatLearn <- function(genphen.data,
     }
     
     
-    gs <- sort(unique(X), decreasing = T)
-    result <- c()
-    if(length(gs) == 1) {
-      D <- data.frame(Y = X)
-      D <- cbind(D, Y)
+    getBoot <- function(D, cv.fold, cv.steps, hdi.level) {
       
+      
+      # posterior output (one extra for multi-trait)
+      posterior <- vector(mode = "list", length = ncol(D)-1)
+      for(i in 1:length(posterior)) {
+        posterior[[i]] <- matrix(data = NA, nrow = cv.steps, ncol = 2)
+      }
+      rm(i)
+      
+      
+      D$Y <- as.character(D$Y)
+      for(i in 1:cv.steps) {
+        # sample at random
+        s <- sample(x = 1:nrow(D), size = ceiling(x = cv.fold*nrow(D)), 
+                    replace = FALSE)
+        train <- D[s, ]
+        test <- D[-s, ]
+        
+        
+        # TODO: dummy (check if inference needed at all e.g. 1 class only)
+        if(length(unique(train$Y)) == 1) {
+          for(j in 1:length(posterior)) {
+            posterior[[j]][i, ] <- c(NA, NA)
+          }
+        }
+        else {
+          for(j in 1:length(posterior)) {
+            
+            # train classification model (try condition to avoid errors in case
+            # only one-level predictor is train data)
+            svm.out <- try(e1071::svm(as.factor(Y)~.,data = train[, c(1, j+1)],
+                                      type = "C-classification"), silent = TRUE)
+            
+            if(class(svm.out)[1] == "try-error") {
+              posterior[[j]][i, 1:2] <- c(NA, NA)
+            }
+            else {
+              # test classification model
+              pr <- stats::predict(object = svm.out, newdata = test)
+              
+              
+              # compute classification accuracy (1 - classification error)
+              test$Y <- as.character(test$Y)
+              pr <- as.character(pr)
+              ca <- sum(test$Y == pr)/nrow(test)
+              
+              
+              # compute k statistics
+              k <- getKappa(real = test$Y, predicted = pr, aas = unique(D$Y))
+              
+              posterior[[j]][i, 1:2] <- c(ca, k)
+            }
+          }
+        }
+      }
+      
+      # compute stats
+      summary <- c()
+      for(j in 1:length(posterior)) {
+        ca <- posterior[[j]][, 1]
+        ca <- ca[is.finite(ca)]
+        ca.mean <- mean(x = ca)
+        # get HDI
+        ca.hdi <- getHdi(vec = posterior[[j]][,1], hdi.level = hdi.level)
+        ca.L <- as.numeric(ca.hdi[1])
+        ca.H <- as.numeric(ca.hdi[2])
+        
+        k <- posterior[[j]][, 2]
+        k <- k[is.finite(k)]
+        k.mean <- mean(x = k)
+        # get HDI
+        k.hdi <- getHdi(vec = posterior[[j]][, 2], hdi.level = hdi.level)
+        k.L <- as.numeric(k.hdi[1])
+        k.H <- as.numeric(k.hdi[2])
+        
+        
+        # summary append
+        row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
+                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
+        summary <- rbind(summary, row)
+      }
+      
+      return (summary)
+    }
+    
+    
+    i <- which(X %in% c(1, -1))
+    D <- data.frame(Y = as.character(X))
+    colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
+    D <- cbind(D, Y)
+    D <- D[i, ]
+    
+    
+    # if c.v. can be done with given cv.fold and # of data points
+    result <- c()
+    if(ceiling(cv.fold*nrow(D)) == nrow(D)) {
       for(i in 1:ncol(Y)) {
         out <- data.frame(ca = NA, ca.L = NA, ca.H = NA,
                           k = NA, k.L = NA, k.H = NA,
-                          i = i, ref = gs, alt = NA, 
-                          refN = nrow(D), altN = NA,
-                          site = site, stringsAsFactors = FALSE)
+                          p = i, stringsAsFactors = FALSE)
         result <- rbind(result, out)
       }
     }
     else {
-      for(gi in 1:(length(gs)-1)) {
-        for(gj in (gi+1):length(gs)) {
-          
-          
-          i <- which(X %in% c(gs[gi], gs[gj]))
-          D <- data.frame(Y = X)
-          colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
-          D <- cbind(D, Y)
-          D <- D[i, ]
-          
-          # if c.v. can be done with given cv.fold and # of data points
-          if(ceiling(cv.fold*nrow(D)) == nrow(D)) {
-            for(i in 1:ncol(Y)) {
-              out <- data.frame(ca = NA, ca.L = NA, ca.H = NA,
-                                k = NA, k.L = NA, k.H = NA,
-                                i = i, ref = gs[gi], alt = gs[gj],
-                                refN = sum(X == gs[gi]),
-                                altN = sum(X == gs[gj]),
-                                site = site, stringsAsFactors = FALSE)
-              result <- rbind(result, out)
-            }
-          }
-          else {
-            # run
-            p <- getBoot(D = D, 
-                         cv.fold = cv.fold, 
-                         cv.steps = cv.steps, 
-                         hdi.level = hdi.level)
-            
-            # summarize
-            p$ref <- gs[gi]
-            p$alt <- gs[gj]
-            p$refN = sum(X == gs[gi])
-            p$altN = sum(X == gs[gj])
-            p$site = site
-            result <- rbind(result, p)
-          }
-        }
-      }
+      # run
+      p <- getBoot(D = D, 
+                   cv.fold = cv.fold, 
+                   cv.steps = cv.steps, 
+                   hdi.level = hdi.level)
+      result <- rbind(result, p)
     }
+    
     return (result)
   }
   
@@ -1299,10 +1358,10 @@ runStatLearn <- function(genphen.data,
   cl <- parallel::makeCluster(cores)
   doParallel::registerDoParallel(cl)
   if(method == "rf") {
-    cas <- (foreach(j = 1:ncol(genphen.data$genotype),
+    cas <- (foreach(j = 1:ncol(genphen.data$X),
                     .export = c("getHdi", "getKappa"),
                     .packages = c("ranger")) %dopar%
-              runRf(X = as.matrix(genphen.data$genotype[, j]),
+              runRf(X = as.matrix(genphen.data$X[, j]),
                     Y = genphen.data$Y,
                     cv.fold = dot.param[["cv.fold"]],
                     cv.steps = cv.steps,
@@ -1311,10 +1370,10 @@ runStatLearn <- function(genphen.data,
                     site = j))
   }
   else if(method == "svm") {
-    cas <- (foreach(j = 1:ncol(genphen.data$genotype),
+    cas <- (foreach(j = 1:ncol(genphen.data$X),
                     .export = c("getHdi", "getKappa"),
                     .packages = c("e1071")) %dopar%
-              runSvm(X = as.matrix(genphen.data$genotype[, j]),
+              runSvm(X = as.matrix(genphen.data$X[, j]),
                      Y = genphen.data$Y,
                      cv.fold = dot.param[["cv.fold"]],
                      cv.steps = cv.steps,
@@ -1325,6 +1384,7 @@ runStatLearn <- function(genphen.data,
   parallel::stopCluster(cl = cl)
   doParallel::stopImplicitCluster()
   
+  cas <- do.call(rbind, cas)
   return (cas)
 }
 
@@ -1347,8 +1407,8 @@ runBayesianInference <- function(genphen.data,
     for(i in 1:genphen.data$Ntd) {
       Yd <- cbind(Yd, as.numeric(genphen.data$Yd[, i]))
     }
+    genphen.data$Yd <- Yd
   }
-  genphen.data$Yd <- Yd
   
   
   data.list <- list(N = genphen.data$N, 
@@ -1379,6 +1439,40 @@ runBayesianInference <- function(genphen.data,
   
   # return
   return (list(posterior = posterior))
+}
+
+
+
+
+
+# Description:
+# Combine data from Bayesian inference and statistical learning
+getScores <- function(p, s, 
+                      genphen.data, 
+                      hdi.level) {
+  probs <- c((1-hdi.level)/2, 1-(1-hdi.level)/2)
+  d.full <- data.frame(summary(p$posterior, probs = probs)$summary,
+                       stringsAsFactors = FALSE)
+  d.full$par <- rownames(d.full)
+  
+  
+  xmap <- genphen.data$xmap
+  scores <- vector(mode = "list", length = ncol(genphen.data$Y))
+  for(i in 1:ncol(genphen.data$Y)) {
+    s.p <- s[s$p == i, ]
+    
+    key <- paste("beta\\[", i, "\\,", sep = '')
+    d <- d.full[which(regexpr(pattern = key, text = d.full$par) != -1 
+                      & regexpr(pattern = "alpha|sigma|nu|mu|tau|z", 
+                                text = d.full$par) == -1), ]
+    d$i <- i
+    d$i <- gsub(pattern = key, replacement = '', x = d$par)
+    d$i <- gsub(pattern = "\\]", replacement = '', x = d$i)
+    d$i <- as.numeric(d$i)
+    scores[[i]] <- cbind(xmap, d, s[s$p == i, ])
+  }
+  
+  return (scores)
 }
 
 

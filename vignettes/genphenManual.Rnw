@@ -209,8 +209,8 @@ Y_{ij} \sim \text{Binomial}(\alpha_{j}+\beta_{j}*X_{ij}, N_{ij}) \\
 \mu_{\beta} \sim \text{Student-t}(1, 0, 10) \\
 \nu_{\alpha} \sim \text{Gamma}(2.0, 0.1) \\
 \nu_{\beta} \sim \text{Gamma}(2.0, 0.1) \\
-\sigma_{\alpha} \sim \text{Half-Cauchy}(0, 1) \\
-\sigma_{\beta} \sim \text{Half-Cauchy}(0, 1)
+\sigma_{\alpha} \sim \text{Half-Cauchy}(0, 5) \\
+\sigma_{\beta} \sim \text{Half-Cauchy}(0, 5)
 \end{gather*}
 where $i$ and $j$ index the different genotypes and SNPs; $Y$ is the number of 
 individuals with genotype $i$ having the reference phenotype (e.g. phenotype=1); 
@@ -251,49 +251,49 @@ successful convergence and are presented to the user. Built-in poterior
 predictive checks are also run to test the validity of our models.
 
 
-\paragraph{Bhattacharyya coefficient ($BC$)}
-The posterior distributions of the infered parameters of the GLMs introduced
-above, can be used to perform predictions, i.e. to simulate distributions of 
-phenotype under the different genetic states of each SNP. The simulated data 
-for each genotype can then be used to estimate the degree of overlap between 
-the simulated phenotype distributions in two genetic states of the SNPs. We 
-quantified the overlap using the Bhattacharyya coefficient ($BC$):
-\begin{gather*}
-BC(p_1, p_2) = \int_x\sqrt{(p_1(x) \cdot p_2(x))} dx
-\end{gather*}
-where $p_1$ and $p_2$ are the simulated phenotype distributions in both genetic
-states of a SNP. For a complete overlap $BC = 1$ (i.e. no difference between
-the phenotype distributions in the two genetic state), and $BC = 0$ for no 
-overlap (significant difference).
+%\paragraph{Bhattacharyya coefficient ($BC$)}
+%The posterior distributions of the infered parameters of the GLMs introduced
+%above, can be used to perform predictions, i.e. to simulate distributions of 
+%phenotype under the different genetic states of each SNP. The simulated data 
+%for each genotype can then be used to estimate the degree of overlap between 
+%the simulated phenotype distributions in two genetic states of the SNPs. We 
+%quantified the overlap using the Bhattacharyya coefficient ($BC$):
+%\begin{gather*}
+%BC(p_1, p_2) = \int_x\sqrt{(p_1(x) \cdot p_2(x))} dx
+%\end{gather*}
+%where $p_1$ and $p_2$ are the simulated phenotype distributions in both genetic
+%states of a SNP. For a complete overlap $BC = 1$ (i.e. no difference between
+%the phenotype distributions in the two genetic state), and $BC = 0$ for no 
+%overlap (significant difference).
 
 
-\subsection{Retrospective power analysis}
-Assuming the true effect (e.g. of a SNP) is decently explained by the effect 
-estimated from the data, retrospective power analysis (contentious idea
-\footnote{Gelman, Andrew, and John Carlin. "Beyond power calculations: Assessing 
-type S (sign) and type M (magnitude) errors." Perspectives on Psychological 
-Science 9.6 (2014): 641-651.}) (RPA) can be conducted to compute the statistical 
-power of each SNP. \texttt{genphen} implements the following procedure for RPA:
-\begin{enumerate}
-\item Draw parameter estimates from the posterior probabilities and use them to 
-generate new data (simulated genotype), with an equal sample size as the input
-\item Analyze the simulated data with the univariate version of the models 
-introduced in the methods section~\ref{sec:methods}, and summarize each 
-association according to the mean of the inferred slope coefficient ($\beta$) 
-and the appropriate HDI (e.g. 95\% HDI)
-\item Repeat steps 1-2 multiple times, after which we estimate the following 
-statistics for each SNP:
-\begin{itemize}
-\item Power-error - Ratio of RPA iterations in which a statistically 
-insignificant effect, i.e. slope coefficient with HDI containing the the null 
-effect. To estimate the power of a SNP: Power = 1 - Power-error
-\item Sign-error - Ratio of RPA runs in which the slope coefficient has a 
-different sign compared to the originally estimated slope
-\item slope-mean - The mean of the slope coefficients computed during the RPA
-\item slope-sd - The standard deviation of the slope coefficients computed 
-during the RPA
-\end{itemize}
-\end{enumerate}
+%\subsection{Retrospective power analysis}
+%Assuming the true effect (e.g. of a SNP) is decently explained by the effect 
+%estimated from the data, retrospective power analysis (contentious idea
+%\footnote{Gelman, Andrew, and John Carlin. "Beyond power calculations: Assessing 
+%type S (sign) and type M (magnitude) errors." Perspectives on Psychological 
+%Science 9.6 (2014): 641-651.}) (RPA) can be conducted to compute the statistical 
+%power of each SNP. \texttt{genphen} implements the following procedure for RPA:
+%\begin{enumerate}
+%\item Draw parameter estimates from the posterior probabilities and use them to 
+%generate new data (simulated genotype), with an equal sample size as the input
+%\item Analyze the simulated data with the univariate version of the models 
+%introduced in the methods section~\ref{sec:methods}, and summarize each 
+%association according to the mean of the inferred slope coefficient ($\beta$) 
+%and the appropriate HDI (e.g. 95\% HDI)
+%\item Repeat steps 1-2 multiple times, after which we estimate the following 
+%statistics for each SNP:
+%\begin{itemize}
+%\item Power-error - Ratio of RPA iterations in which a statistically 
+%insignificant effect, i.e. slope coefficient with HDI containing the the null 
+%effect. To estimate the power of a SNP: Power = 1 - Power-error
+%\item Sign-error - Ratio of RPA runs in which the slope coefficient has a 
+%different sign compared to the originally estimated slope
+%\item slope-mean - The mean of the slope coefficients computed during the RPA
+%\item slope-sd - The standard deviation of the slope coefficients computed 
+%during the RPA
+%\end{itemize}
+%\end{enumerate}
 
 
 \subsection{Phylogenetic Bias ($B$)}
@@ -414,19 +414,16 @@ has already been log10-transformed and is normally distributed.
 
 
 \paragraph{Association analysis}
-Next, we perform the genetic association study for \underline{continuous} 
-phenotypes with \texttt{genphen} using the following settings:
+Next, we perform the genetic association study for a single 
+\underline{quantitative ('Q')} phenotype with \texttt{genphen} using 
+the following settings:
 \begin{itemize}
 \item \underline{hierarchical} Bayesian model will be run with \underline{2 MCMC 
 chains} composed of \underline{1,500 iterations} each, including \underline{500 
 warmup iterations}. 
 \item \underline{Random forest} was selected as for the statistical learning, 
 which will be run in a cross-validation mode with \underline{200 iterations}. 
-\item All estimates will be reported according to their mean and \underline{95\% 
-HDI} 
-\item Retrospective power analysis with \underline{5 iterations} will be 
-performed. 
-\item The resulting \underline{stan object} will be returned for debugging.
+\item We report for each metrics its mean and \underline{95\% HDI}
 \item Whenever possible, \underline{2 cores} will be used.
 \end{itemize}
 
@@ -435,17 +432,15 @@ performed.
 # Run genphen
 c.out <- genphen::runGenphen(genotype = genotype.saap[, 82:89], 
                              phenotype = phenotype.saap,
-                             phenotype.type = "continuous",
+                             phenotype.type = "Q",
                              model.type = "hierarchical",
                              mcmc.chains = 2,
-                             mcmc.iterations = 1500,
+                             mcmc.steps = 1500,
                              mcmc.warmup = 500,
                              cores = 2,
                              hdi.level = 0.95,
                              stat.learn.method = "rf",
-                             cv.iterations = 200,
-                             rpa.iterations = 5,
-                             with.stan.obj = TRUE)
+                             cv.steps = 200)
 @
 \end{scriptsize}
 
@@ -465,15 +460,16 @@ genotype data) and the type of the polymorphism (e.g. nucleotide mutation T->A).
 c.score <- c.out$scores
 
 # Some optional formatting for the SNPs (label = site : genotype1 -> genotype2)
-c.score$label <- paste(c.score$site, ":", c.score$g1,
-                       "->", c.score$g0, sep = '')
+c.score$label <- paste(c.score$site, ":", c.score$ref,
+                       "->", c.score$alt, sep = '')
 
 # Visualization
 g <- ggplot(data = c.score)+
-  geom_errorbar(aes(x = ca, ymin = beta.L, ymax = beta.H),
+  geom_errorbar(aes(x = ca.mean, ymin = beta.hdi.low, ymax = beta.hdi.high),
                 width = 0.015, col = "darkgray")+
-  geom_point(aes(x = ca, y = beta.mean, fill = kappa), shape = 21, size = 4)+
-  geom_text_repel(aes(x = ca, y = beta.mean, label = label), size = 5)+
+  geom_point(aes(x = ca.mean, y = beta.mean, fill = kappa.mean), 
+             shape = 21, size = 4)+
+  geom_text_repel(aes(x = ca.mean, y = beta.mean, label = label), size = 5)+
   theme_bw(base_size = 14)+
   ylab(label = "Slope coefficient (with 95% HDI)")+
   scale_x_continuous(name = "CA", limits = c(0, 1.05))+
@@ -508,33 +504,33 @@ getHdiPretty <- function(x, digits = 2) {
   x[2] <- round(x = x[2], digits = digits)
   return(paste("(", x[1], ", ", x[2], ")", sep = ''))
 }
-c.score$beta.hdi <- apply(X = c.score[, c("beta.L", "beta.H")],
+c.score$beta.hdi <- apply(X = c.score[, c("beta.hdi.low", "beta.hdi.high")],
                           MARGIN = 1, getHdiPretty, digits = 2)
-c.score$ca.hdi <- apply(X = c.score[, c("ca.L", "ca.H")],
-                          MARGIN = 1, getHdiPretty, digits = 2)
-c.score$kappa.hdi <- apply(X = c.score[, c("kappa.L", "kappa.H")],
-                          MARGIN = 1, getHdiPretty, digits = 2)
+c.score$ca.hdi <- apply(X = c.score[, c("ca.hdi.low", "ca.hdi.high")],
+                        MARGIN = 1, getHdiPretty, digits = 2)
+c.score$kappa.hdi <- apply(X = c.score[, c("kappa.hdi.low", "kappa.hdi.high")],
+                           MARGIN = 1, getHdiPretty, digits = 2)
 
 # Print table
-print(xtable(c.score[, c("label", "beta.mean", "beta.hdi", "ca",
-                         "ca.hdi", "kappa", "kappa.hdi", "bc"), ],
-             align = rep(x = "c", times = 9, digits = 2)),
+print(xtable(c.score[, c("label", "beta.mean", "beta.hdi", "ca.mean",
+                         "ca.hdi", "kappa.mean", "kappa.hdi"), ],
+             align = rep(x = "c", times = 8, digits = 2)),
       include.rownames = FALSE, size = "scriptsize")
 @
 \end{scriptsize}
 
 
 <<echo=FALSE, include=TRUE, results=tex>>=
-print(xtable(c.score[, c("label", "beta.mean", "beta.hdi", "ca",
-                         "ca.hdi", "kappa", "kappa.hdi", "bc"), ],
-             align = rep(x = "c", times = 9, digits = 2)),
+print(xtable(c.score[, c("label", "beta.mean", "beta.hdi", "ca.mean",
+                         "ca.hdi", "kappa.mean", "kappa.hdi"), ],
+             align = rep(x = "c", times = 8, digits = 2)),
       include.rownames = FALSE, size = "scriptsize")
 @
 
 
 
 \paragraph{MCMC convergence}
-Next, we want to check the validity our Bayesian inference model by inspecting
+You might want to check the validity your Bayesian inference by inspecting
 the \texttt{genphen} output named convergence which contains information about
 the markov chain monte carlo (MCMC) simulation done with R package rstan
 including potential scale reduction factor (Rhat) and effective sampling size
@@ -544,41 +540,25 @@ each warning please read Stan documentation (mc-stan.org/users/documentation/).
 
 \begin{scriptsize}
 <<echo=TRUE, include=TRUE, results=hide>>=
-# Get the convergence output
-c.convergence <- c.out$convergence
-c.convergence$label <- paste(c.convergence$site, ":",
-                             c.convergence$g1, "->",
-                             c.convergence$g0, sep = '')
-c.convergence$label[c.convergence$site == ''] <- ''
-
-# Print table
-print(xtable(c.convergence[, c("label", "par", "Rhat", "n_eff")],
-             align = rep(x = "c", times = 5, digits = 2)),
-      include.rownames = FALSE, size = "scriptsize")
+rstan::check_hmc_diagnostics(c.out$complete.posterior)
+rstan::stan_rhat(c.out$complete.posterior)
+rstan::stan_ess(c.out$complete.posterior)
+rstan::stan_diag(c.out$complete.posterior)
 @
 \end{scriptsize}
 
 
-<<echo=FALSE, include=TRUE, results=tex>>=
-print(xtable(c.convergence[, c("label", "par", "Rhat", "n_eff")],
-             align = rep(x = "c", times = 5, digits = 2)),
-      include.rownames = FALSE, size = "scriptsize")
+<<echo=FALSE, include=TRUE>>=
+rstan::check_hmc_diagnostics(c.out$complete.posterior)
+rstan::stan_rhat(c.out$complete.posterior)
+rstan::stan_ess(c.out$complete.posterior)
+rstan::stan_diag(c.out$complete.posterior)
 @
 
 
 \paragraph{MCMC sampling issues}
 Please refer to the Stan documentation to understand the content of the stan 
 object (mc-stan.org/users/documentation/). 
-
-\begin{scriptsize}
-<<echo=TRUE, include=TRUE, results=hide>>=
-# We can visualize the different MCMC properties as follows:
-s1 <- rstan::stan_diag(object = c.out$stan.obj, information = "sample")
-s2 <- rstan::stan_diag(object = c.out$stan.obj, information = "stepsize")
-s3 <- rstan::stan_diag(object = c.out$stan.obj, information = "treedepth")
-s4 <- rstan::stan_diag(object = c.out$stan.obj, information = "divergence")
-@
-\end{scriptsize}
 
 
 \paragraph{Posterior predictive checks}
@@ -589,30 +569,30 @@ model by comparing the predicted and observed data.
 
 \begin{scriptsize}
 <<echo=FALSE, include=TRUE, results=hide>>=
-# Get the ppc output
-c.ppc <- c.out$ppc
-
-# Optional setting of the min/max axis in order to make 
-# the plot symmetric
-min.axis <- min(c.ppc$pred.1.L, c.ppc$pred.0.L)
-max.axis <- max(c.ppc$pred.1.H, c.ppc$pred.0.H)
-
-# Visualization
-g <- ggplot(data = c.ppc)+
-  geom_errorbar(aes(x = pred.mean.1, ymin = pred.1.L, ymax = pred.1.H),
-                col = "darkgray")+
-  geom_errorbar(aes(x = pred.mean.0, ymin = pred.0.L, ymax = pred.0.H),
-                col = "darkgray")+
-  geom_point(aes(x = pred.mean.1, y = real.mean.1))+
-  geom_point(aes(x = pred.mean.0, y = real.mean.0))+
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", col = "red")+
-  xlim(c(min.axis, max.axis))+
-  ylim(c(min.axis, max.axis))+
-  ylab(label = "Predicted mean phenotype (with 95% HDI)")+
-  xlab(label = "Real mean phenotype")+
-  theme_bw(base_size = 14)
-
-g
+# # Get the ppc output
+# c.ppc <- c.out$ppc
+# 
+# # Optional setting of the min/max axis in order to make 
+# # the plot symmetric
+# min.axis <- min(c.ppc$pred.1.L, c.ppc$pred.0.L)
+# max.axis <- max(c.ppc$pred.1.H, c.ppc$pred.0.H)
+# 
+# # Visualization
+# g <- ggplot(data = c.ppc)+
+#   geom_errorbar(aes(x = pred.mean.1, ymin = pred.1.L, ymax = pred.1.H),
+#                 col = "darkgray")+
+#   geom_errorbar(aes(x = pred.mean.0, ymin = pred.0.L, ymax = pred.0.H),
+#                 col = "darkgray")+
+#   geom_point(aes(x = pred.mean.1, y = real.mean.1))+
+#   geom_point(aes(x = pred.mean.0, y = real.mean.0))+
+#   geom_abline(slope = 1, intercept = 0, linetype = "dashed", col = "red")+
+#   xlim(c(min.axis, max.axis))+
+#   ylim(c(min.axis, max.axis))+
+#   ylab(label = "Predicted mean phenotype (with 95% HDI)")+
+#   xlab(label = "Real mean phenotype")+
+#   theme_bw(base_size = 14)
+# 
+# g
 @
 \end{scriptsize}
 
@@ -620,55 +600,10 @@ g
 \begin{figure}[H]
 \centering
 <<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=5, height=4>>=
-g
+# g
 @
 \end{figure}
 
-
-
-\paragraph{Retrospective power analysis}
-The power of the SNPs having non-significant effects in the main analysis was 
-not analyzed.
-
-\begin{scriptsize}
-<<echo=TRUE, include=TRUE, results=hide>>=
-# Get the RPA output
-c.rpa <- c.out$rpa
-c.rpa$label <- paste(c.rpa$site, ":", c.rpa$g1, "->", c.rpa$g0, sep = '')
-
-g <- ggplot(data = c.rpa)+
-  geom_text_repel(aes(x = rpa.power.error, y = rpa.sign.error, label = label),
-                  arrow = arrow(length = unit(0.02, "npc")), size = 4)+
-  theme_bw(base_size = 14)
-g
-@
-\end{scriptsize}
-
-
-\begin{figure}[H]
-\centering
-<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=5, height=4>>=
-g
-@
-\end{figure}
-
-
-\begin{scriptsize}
-<<echo=TRUE, include=TRUE, results=hide>>=
-print(xtable(c.rpa[, c("label",  "rpa.power.error", "rpa.sign.error",
-                       "rpa.beta.mean", "rpa.beta.sd", "rpa.N")],
-             align = rep(x = "c", times = 7, digits = 2)),
-      include.rownames = FALSE, size = "small")
-@
-\end{scriptsize}
-
-
-<<echo=FALSE, include=TRUE, results=tex>>=
-print(xtable(c.rpa[, c("label",  "rpa.power.error", "rpa.sign.error",
-                       "rpa.beta.mean", "rpa.beta.sd", "rpa.N")],
-             align = rep(x = "c", times = 7, digits = 2)),
-      include.rownames = FALSE, size = "scriptsize")
-@
 
 
 
@@ -752,7 +687,8 @@ plot(as.phylo(c.hclust), tip.color = color.b, cex = 0.6,
 
 
 
-\subsection{II: Association between SNP and a *dichotomous* phenotype}
+\subsection{II: Association between SNP and two phenotypes (dichotomous and 
+quantitative)}
 \label{sec:case2}
 In the second case study we show you how to use \texttt{genphen} in case of
 dichotomous phenotypes. Here, the genotype is a single SNP in a study of 51
@@ -834,20 +770,20 @@ HDI}
 
 \begin{scriptsize}
 <<echo=TRUE, include=TRUE, results=hide>>=
-# run genphen
-d.out <- genphen::runGenphen(genotype = genotype.snp,
-                             phenotype = dichotomous.phenotype.snp,
-                             phenotype.type = "dichotomous",
-                             model.type = "univariate",
-                             mcmc.chains = 2,
-                             mcmc.iterations = 1500,
-                             mcmc.warmup = 500,
-                             cores = 2,
-                             hdi.level = 0.95,
-                             stat.learn.method = "rf",
-                             cv.iterations = 200,
-                             rpa.iterations = 0,
-                             with.stan.obj = FALSE)
+# # run genphen
+# d.out <- genphen::runGenphen(genotype = genotype.snp,
+#                              phenotype = dichotomous.phenotype.snp,
+#                              phenotype.type = "dichotomous",
+#                              model.type = "univariate",
+#                              mcmc.chains = 2,
+#                              mcmc.steps = 1500,
+#                              mcmc.warmup = 500,
+#                              cores = 2,
+#                              hdi.level = 0.95,
+#                              stat.learn.method = "rf",
+#                              cv.steps = 200,
+#                              rpa.steps = 0,
+#                              with.stan.obj = FALSE)
 @
 \end{scriptsize}
 
@@ -859,27 +795,27 @@ Cohen's $\kappa$.
 
 \begin{scriptsize}
 <<echo=TRUE, include=TRUE, results=hide>>=
-# Get scores data
-d.score <- d.out$scores
-
-# Some optional formatting
-d.score$label<-paste(d.score$site, ":", d.score$g1, "->", d.score$g0, sep = '')
-
-# Visualization
-g <- ggplot(data = d.score)+
-  geom_errorbar(aes(x = ca, ymin = beta.L, ymax = beta.H),
-                width = 0.015, col = "darkgray")+
-  geom_point(aes(x = ca, y = beta.mean, fill = kappa), shape = 21, size = 4)+
-  geom_text_repel(aes(x = ca, y = beta.mean, label = label), size = 5)+
-  theme_bw(base_size = 14)+
-  ylab(label = "Slope coefficient (with 95% HDI)")+
-  scale_x_continuous(name = "CA", limits = c(0, 1.05))+
-  geom_hline(yintercept = 0, linetype = "dashed")+
-  theme(legend.position = "top")+
-  scale_fill_distiller(palette = "Spectral", limits = c(-0.2, 1))+
-  guides(fill = guide_colorbar(barwidth = 10, barheight = 1.5))
-
-g
+# # Get scores data
+# d.score <- d.out$scores
+# 
+# # Some optional formatting
+# d.score$label<-paste(d.score$site, ":", d.score$g1, "->", d.score$g0, sep = '')
+# 
+# # Visualization
+# g <- ggplot(data = d.score)+
+#   geom_errorbar(aes(x = ca, ymin = beta.L, ymax = beta.H),
+#                 width = 0.015, col = "darkgray")+
+#   geom_point(aes(x = ca, y = beta.mean, fill = kappa), shape = 21, size = 4)+
+#   geom_text_repel(aes(x = ca, y = beta.mean, label = label), size = 5)+
+#   theme_bw(base_size = 14)+
+#   ylab(label = "Slope coefficient (with 95% HDI)")+
+#   scale_x_continuous(name = "CA", limits = c(0, 1.05))+
+#   geom_hline(yintercept = 0, linetype = "dashed")+
+#   theme(legend.position = "top")+
+#   scale_fill_distiller(palette = "Spectral", limits = c(-0.2, 1))+
+#   guides(fill = guide_colorbar(barwidth = 10, barheight = 1.5))
+# 
+# g
 @
 \end{scriptsize}
 
@@ -887,7 +823,7 @@ g
 \begin{figure}[H]
 \centering
 <<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=5, height=3.5>>=
-g
+# g
 @
 \end{figure}
 
@@ -899,25 +835,25 @@ observed data.
 
 \begin{scriptsize}
 <<echo=FALSE, include=TRUE, results=hide>>=
-# Get the ppc output
-d.ppc <- d.out$ppc
-
-# Visualization
-g <- ggplot(data = d.ppc)+
-  geom_errorbar(aes(x = pred.mean.1, ymin = pred.1.L, ymax = pred.1.H),
-                col = "darkgray")+
-  geom_errorbar(aes(x = pred.mean.0, ymin = pred.0.L, ymax = pred.0.H),
-                col = "darkgray")+
-  geom_point(aes(x = pred.mean.1, y = real.mean.1/d.ppc$n1))+
-  geom_point(aes(x = pred.mean.0, y = real.mean.0/d.ppc$n0))+
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed", col = "red")+
-  xlim(c(0, 1))+
-  ylim(c(0, 1))+
-  ylab(label = "Predicted mean phenotype (with 95% HDI)")+
-  xlab(label = "Real mean phenotype")+
-  theme_bw(base_size = 14)
-
-g
+# # Get the ppc output
+# d.ppc <- d.out$ppc
+# 
+# # Visualization
+# g <- ggplot(data = d.ppc)+
+#   geom_errorbar(aes(x = pred.mean.1, ymin = pred.1.L, ymax = pred.1.H),
+#                 col = "darkgray")+
+#   geom_errorbar(aes(x = pred.mean.0, ymin = pred.0.L, ymax = pred.0.H),
+#                 col = "darkgray")+
+#   geom_point(aes(x = pred.mean.1, y = real.mean.1/d.ppc$n1))+
+#   geom_point(aes(x = pred.mean.0, y = real.mean.0/d.ppc$n0))+
+#   geom_abline(slope = 1, intercept = 0, linetype = "dashed", col = "red")+
+#   xlim(c(0, 1))+
+#   ylim(c(0, 1))+
+#   ylab(label = "Predicted mean phenotype (with 95% HDI)")+
+#   xlab(label = "Real mean phenotype")+
+#   theme_bw(base_size = 14)
+# 
+# g
 @
 \end{scriptsize}
 
@@ -925,7 +861,7 @@ g
 \begin{figure}[H]
 \centering
 <<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=5, height=4>>=
-g
+# g
 @
 \end{figure}
 
@@ -984,30 +920,18 @@ typical runtime for the provided dataset ($60 \times 50,000$) is few minutes.
 
 \begin{scriptsize}
 <<echo=TRUE, include=F, results=hide>>=
-# Set diagnostic points (in range 1-50,000)
-diagnostic.points <- c(seq(from = 0, to = 100, by = 20),
-                       seq(from = 200, to = 1000, by = 200),
-                       seq(from = 2000, to = 50000, by = 3000))
-diagnostic.points[1] <- 1
+# # Set diagnostic points (in range 1-50,000)
+# diagnostic.points <- c(seq(from = 0, to = 100, by = 20),
+#                        seq(from = 200, to = 1000, by = 200),
+#                        seq(from = 2000, to = 50000, by = 3000))
+# diagnostic.points[1] <- 1
 
 
 # Run diagnostics
 diag <- genphen::runDiagnostics(genotype = gen,
                                 phenotype = phen,
                                 phenotype.type = "continuous",
-                                rf.trees = 50000,
-                                mcmc.chains = 2,
-                                mcmc.iterations = 1500,
-                                mcmc.warmup = 500,
-                                cores = 2,
-                                hdi.level = 0.95,
-                                diagnostic.points = diagnostic.points)
-
-# Get diagnosis scores, and mark effects as significant|not-significant
-diag.stats <- diag$scores
-diag.stats$significant <- ifelse(test = diag.stats$beta.L <= 0
-                                 & diag.stats$beta.H >= 0,
-                                 yes = FALSE, no = TRUE)
+                                rf.trees = 50000)
 @
 \end{scriptsize}
 
@@ -1019,14 +943,13 @@ We can evaluate the distribution of importance scores, and include additional
 \begin{scriptsize}
 <<echo=TRUE, include=TRUE, results=hide>>=
 # Visualization
-g <- ggplot(data = diag$importance.scores)+
-  geom_line(aes(x = importance.rank, y = importance))+
-  xlab("Rank")+
-  ylab("Importance")+
+# Visualization
+g <- ggplot(data = diag)+
+  geom_density(aes(importance))+
+  xlab("Importance")+
   theme_bw(base_size = 14)+
   scale_x_continuous(trans = "log10")+
   annotation_logticks(base = 10, sides = "b")
-
 g
 @
 \end{scriptsize}
@@ -1048,30 +971,22 @@ retaining many SNPs with small effects.
 
 \begin{scriptsize}
 <<echo=TRUE, include=TRUE, results=hide>>=
-# Visualization
-g <- ggplot(data = diag.stats)+
-  geom_errorbar(aes(x = diagnostic.points, ymin = beta.L, ymax = beta.H),
-                col = "gray", width = 0.05)+
-  geom_point(aes(x = diagnostic.points, y = beta.mean, col = significant),
-             size = 2)+
-  geom_hline(yintercept = 0, linetype = "dashed", col = "gray")+
-  theme_bw(base_size = 14)+
-  xlab(label = "Rank")+
-  ylab(label = "Slope coefficient (with 95% HDI)")+
-  scale_x_continuous(trans = "log10", 
-                     breaks = c(1, 10, 100, 10^3, 10^4,5*10^4),
-                     labels = c(1, 10, 100, 10^3, 10^4, 5*10^4))+
-  annotation_logticks(sides = "b")+
-  theme(legend.position = "top")
-
-g
+# # Visualization
+# g <- ggplot(data = diag)+
+#   geom_density(aes(importance))+
+#   xlab("Importance")+
+#   theme_bw(base_size = 14)+
+#   scale_x_continuous(trans = "log10")+
+#   annotation_logticks(base = 10, sides = "b")
+# 
+# g
 @
 \end{scriptsize}
 
 \begin{figure}[H]
 \centering
 <<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=6>>=
-g
+# g
 @
 \end{figure}
 
