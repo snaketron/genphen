@@ -44,21 +44,21 @@ Biostrings object.}
 \details{
 The data reduction procedure includes the following steps:
 \enumerate{
-\item The complete data (independent variables = genotype and response = 
-phenotype) is used to train a random forest (RF) model, in order to quantify 
-the association between each SNP and the phenotype using the variable importance 
-measure implemented in the R package ranger.
-\item Next, we rank the SNPs according to their their importance, and plot the
-distribution of variable importances, to get an insight into the structure of 
-the importances values and potentially disect the signal from the noise.
+\item The complete data (genotypes and a single phenotype) is used to train a 
+random forest (RF) model, which will quantify the importance of each SNP/SAAP in 
+explaining the phenotypeassociation between each SNP and the phenotype.
+\item We can then plot the distribution of variable importances, to get an 
+insight into the structure of the importances values and potentially disect the 
+signal from the noise.
+\item The main analysis can then be performed with runGenphen using a subset 
+(based on their importance) of SNPs
+}
 }
 
-
-\bold{Ranked variable importance scores:}
+\value{
 \item{site}{id of the site (e.g. position in the provided sequence alignment)}
 \item{importance}{Magnitude of importance (impurity) of the site, estimated 
 with random forest implemented in R package ranger}
-\item{importance.rank}{rank of sites based on their importance}
 }
 
 

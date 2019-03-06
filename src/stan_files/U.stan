@@ -11,10 +11,10 @@ data {
 
 
 parameters {
-  vector [Ntq+Ntd] alpha;
+  vector [Nsk] alpha [Ntq+Ntd];
+  vector [Nsk] beta [Ntq+Ntd];
   vector <lower = 0> [Ntq] sigma;
   vector <lower = 1> [Ntq] nu;
-  vector [Nsk] beta [Ntq+Ntd];
 }
 
 
@@ -32,10 +32,10 @@ model {
     }
   }
   
-  alpha ~ student_t(1, 0, 100);
   nu ~ gamma(2, 0.1);
   sigma ~ cauchy(0, 5);
   for(t in 1:(Ntq+Ntd)) {
     beta[t] ~ student_t(1, 0, 10);
+    alpha[t] ~ student_t(1, 0, 100);
   }
 }

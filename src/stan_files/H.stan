@@ -11,22 +11,28 @@ data {
 
 
 parameters {
-  vector [Ntq+Ntd] alpha;
   vector <lower = 0> [Ntq] sigma;
   vector <lower = 1> [Ntq] nu;
+  vector [Ntq+Ntd] mu_alpha;
+  vector <lower = 0> [Ntq+Ntd] sigma_alpha;
+  vector <lower = 0> [Ntq+Ntd] tau_alpha;
+  vector <lower = 1> [Ntq+Ntd] nu_alpha;
   vector [Ntq+Ntd] mu_beta;
   vector <lower = 0> [Ntq+Ntd] sigma_beta;
   vector <lower = 0> [Ntq+Ntd] tau_beta;
   vector <lower = 1> [Ntq+Ntd] nu_beta;
-  vector [Nsk] z [Ntq+Ntd];
+  vector [Nsk] za [Ntq+Ntd];
+  vector [Nsk] zb [Ntq+Ntd];
 }
 
 
 transformed parameters {
+  vector [Nsk] alpha [Ntq+Ntd];
   vector [Nsk] beta [Ntq+Ntd];
 
   for(t in 1:(Ntq+Ntd)) {
-    beta[t] = mu_beta[t] + z[t]*sigma_beta[t]/sqrt(tau_beta[t]);
+    alpha[t] = mu_alpha[t] + za[t]*sigma_alpha[t]/sqrt(tau_alpha[t]);
+    beta[t] = mu_beta[t] + zb[t]*sigma_beta[t]/sqrt(tau_beta[t]);
   }
 }
 
@@ -45,9 +51,9 @@ model {
     }
   }
   
-  alpha ~ student_t(1, 0, 100);
   for(t in 1:(Ntq+Ntd)) {
-    z[t] ~ normal(0, 1);
+    za[t] ~ normal(0, 1);
+    zb[t] ~ normal(0, 1);
   }
   nu ~ gamma(2, 0.1);
   sigma ~ cauchy(0, 5);
@@ -55,4 +61,9 @@ model {
   sigma_beta ~ cauchy(0, 5);
   nu_beta ~ gamma(2, 0.1);
   tau_beta ~ gamma(nu_beta/2, nu_beta/2);
+  
+  mu_alpha ~ student_t(1, 0, 100);
+  sigma_alpha ~ cauchy(0, 5);
+  nu_alpha ~ gamma(2, 0.1);
+  tau_alpha ~ gamma(nu_alpha/2, nu_alpha/2);
 }

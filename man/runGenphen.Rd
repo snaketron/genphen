@@ -92,12 +92,14 @@ through partial pooling).
 }
 
 Metrics:
-To quantify the association between each genotype and phenotype genphen computes multiple measures of association:
+To quantify the association between each genotype and phenotype genphen computes 
+multiple measures of association:
 \itemize{
 
 \item{Effect size  (beta): for each SNP we compute beta (effect) with Bayesian
 inference). beta quantifies the strength of the association between the 
-genotypes and the phenotype. We report for each beta its mean and 95\% (for instance) highest density interval (HDI) of beta, which is defined as the 
+genotypes and the phenotype. We report for each beta its mean and 95\% (for 
+instance) highest density interval (HDI) of beta, which is defined as the 
 interval that covers a 95\% of the posterior distribution, with every point 
 inside the interval having a higher credibility than any point outside it.}
 
@@ -143,6 +145,11 @@ slope coefficient}
 \bold{MCMC convergence parameters:}
 \item{Neff}{Effective sampling size}
 \item{Rhat}{Potential scale reduction factor}
+
+
+\bold{Posterior predictions:}
+\item{ppc}{Posterior prediction check and real data summary for each genotype.}
+
 
 \bold{Posterior summary:}
 \item{complete.posterior}{Complete stan object containing the posterior of each 

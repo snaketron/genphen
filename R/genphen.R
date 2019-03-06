@@ -49,14 +49,14 @@ runGenphen <- function(genotype,
   
   # select model
   if(model.type == "hierarchical") {
-    model.stan <- hmi
+    # model.stan <- hmi
     # TODO: change to
-    # model.stan <- stanmodels$H
+    model.stan <- stanmodels$H
   }
   if(model.type == "univariate") {
-    model.stan <- umi
+    # model.stan <- umi
     # TODO: change to
-    # model.stan <- stanmodels$U
+    model.stan <- stanmodels$U
   }
   
   
@@ -101,7 +101,17 @@ runGenphen <- function(genotype,
                    "ca.mean", "ca.hdi.low", "ca.hdi.high", 
                    "kappa.mean", "kappa.hdi.low", "kappa.hdi.high")
   
-  return (list(scores = o, complete.posterior = p$posterior))
+  
+  # ppc
+  cat("======== Posterior Prediction ======== \n")
+  ppc <- getPpc(posterior = p$posterior, 
+                genphen.data = genphen.data,
+                hdi.level = hdi.level)
+  
+  
+  return (list(scores = o, 
+               ppc = ppc,
+               complete.posterior = p$posterior))
 }
 
 
@@ -158,19 +168,15 @@ runPhyloBiasCheck <- function(input.kinship.matrix,
                               genotype) {
   
   
-  
   # check params
   checkInputPhyloBias(input.kinship.matrix = input.kinship.matrix,
                       genotype = genotype)
   
-  # convert AAMultipleAlignment to matrix if needed
-  genotype <- convertMsaToGenotype(genotype = genotype)
   
-  # if vector genotype => matrix genotype
-  if(is.vector(genotype)) {
-    genotype <- matrix(data = genotype, ncol = 1)
-  }
-  
+  # convert input data to phylo data
+  phylo.data <- getPhyloData(genotype = genotype)
+
+
   # compute kinship if needed
   if(is.null(input.kinship.matrix) | missing(input.kinship.matrix)) {
     kinship.matrix <- e1071::hamming.distance(genotype)
@@ -180,34 +186,30 @@ runPhyloBiasCheck <- function(input.kinship.matrix,
   }
   
   # compute bias
-  bias <- getPhyloBias(genotype = genotype, k.matrix = kinship.matrix)
+  bias <- getPhyloBias(genotype = genotype, 
+                       k.matrix = kinship.matrix)
   
   # bias = 1-dist(feature)/dist(total)
   bias$bias <- 1-bias$feature.dist/bias$total.dist
-  
-  # gen.data and final check for input
-  gen.data <- getGenSummary(genotype = genotype)
-  if(is.null(gen.data)) {
-    stop("No genphen input data found.")
-  }
-  
+
+    
   # append bias to each SNP
-  gen.data$bias.g1 <- NA
-  gen.data$bias.g0 <- NA
-  gen.data$bias <- NA
-  for(i in 1:nrow(gen.data)) {
-    bias.g1 <- bias[bias$site == gen.data$site[i] 
-                    & bias$genotype == gen.data$g1[i], ]
-    bias.g0 <- bias[bias$site == gen.data$site[i] 
-                    & bias$genotype == gen.data$g0[i], ]
-    gen.data$bias.g1[i] <- bias.g1$bias[1]
-    gen.data$bias.g0[i] <- bias.g0$bias[1]
-    gen.data$bias[i] <- max(bias.g1$bias[1], bias.g0$bias[1])
+  phylo.data$bias.ref <- NA
+  phylo.data$bias.alt <- NA
+  phylo.data$bias <- NA
+  for(i in 1:nrow(phylo.data)) {
+    bias.ref <- bias[bias$site == phylo.data$site[i] & 
+                       bias$genotype == phylo.data$ref[i], ]
+    bias.alt <- bias[bias$site == phylo.data$site[i] & 
+                      bias$genotype == phylo.data$alt[i], ]
+    phylo.data$bias.ref[i] <- bias.ref$bias[1]
+    phylo.data$bias.alt[i] <- bias.alt$bias[1]
+    phylo.data$bias[i] <- max(bias.ref$bias[1], bias.alt$bias[1])
   }
   
   
   # sort by site
-  bias <- gen.data[, c("site", "g1", "g0", "bias.g1", "bias.g0", "bias")]
+  bias <- phylo.data[, c("site", "ref", "alt", "bias.ref", "bias.alt", "bias")]
   bias <- bias[order(bias$site, decreasing = FALSE), ]
   
   return (list(bias = bias, kinship.matrix = kinship.matrix))
