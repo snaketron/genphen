@@ -8,7 +8,6 @@ getStanData <- function(genotype,
                         phenotype.type) {
   
   
-  
   # Description:
   # Returns TRUE if the genotype data is composed of at most two-alleles 
   # at each SNP.
@@ -39,20 +38,7 @@ getStanData <- function(genotype,
     if(is.vector(genotype)) {
       genotype <- matrix(data = genotype, ncol = 1)
     }
-    
-    
-    # map the groups (genotypes) at each SNP to a number
-    gmap <- as.data.frame(matrix(data = 0, 
-                                 nrow = nrow(genotype), 
-                                 ncol = ncol(genotype)))
-    max.i <- 0
-    for(i in 1:ncol(genotype)) {
-      gmap[, i] <- as.numeric(as.factor(genotype[, i]))+max.i
-      max.i <- max(gmap[, i])
-      gmap[, i] <- as.factor(gmap[, i])
-    }
-    
-    
+  
     # if vector genotype => matrix genotype
     if(is.vector(phenotype)) {
       phenotype <- matrix(data = phenotype, ncol = 1)
@@ -79,7 +65,6 @@ getStanData <- function(genotype,
     
     # return
     return (list(genotype = genotype, 
-                 gmap = gmap,
                  phenotype = phenotype,
                  phenotype.type = phenotype.type))
   }
@@ -187,7 +172,7 @@ getStanData <- function(genotype,
               Ntd = ncol(Yd),
               is.bi = is.bi,
               xmap = x.map,
-              gmap = f.data$gmap,
+              genotype = f.data$genotype,
               phenotype.type = f.data$phenotype.type)
     
     return (s)
@@ -202,7 +187,7 @@ getStanData <- function(genotype,
   
   # stan data
   stan.data <- getStanFormat(f.data = f.data, 
-                             is.bi = isBiallelic(f.data$gmap))
+                             is.bi = isBiallelic(f.data$genotype))
   
   
   # return

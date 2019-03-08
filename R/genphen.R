@@ -138,7 +138,7 @@ runDiagnostics <- function(genotype,
   
   
   # create genphen data
-  rf.data <- as.data.frame(genphen.data$gmap)
+  rf.data <- as.data.frame(genphen.data$genotype)
   rf.data$Y <- genphen.data$Y[, 1]
   if(phenotype.type == "D") {
     rf.data$Y <- as.factor(rf.data$Y)
