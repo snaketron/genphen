@@ -979,8 +979,7 @@ runStatLearn <- function(genphen.data,
                          cv.steps,
                          ntree,
                          hdi.level,
-                         cores,
-                         dot.param) {
+                         cores) {
   
   
   # RF analysis
@@ -1439,10 +1438,10 @@ runStatLearn <- function(genphen.data,
                     .packages = c("ranger")) %dopar%
               runRf(X = as.matrix(genphen.data$X[, j]),
                     Y = genphen.data$Y,
-                    cv.fold = dot.param[["cv.fold"]],
+                    cv.fold = cv.fold,
                     cv.steps = cv.steps,
                     hdi.level = hdi.level,
-                    ntree = dot.param[["ntree"]],
+                    ntree = ntree,
                     site = j))
   }
   else if(method == "svm") {
@@ -1451,7 +1450,7 @@ runStatLearn <- function(genphen.data,
                     .packages = c("e1071")) %dopar%
               runSvm(X = as.matrix(genphen.data$X[, j]),
                      Y = genphen.data$Y,
-                     cv.fold = dot.param[["cv.fold"]],
+                     cv.fold = cv.fold,
                      cv.steps = cv.steps,
                      hdi.level = hdi.level,
                      site = j))

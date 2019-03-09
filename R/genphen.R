@@ -80,8 +80,7 @@ runGenphen <- function(genotype,
                     cv.steps = cv.steps,
                     ntree = dot.param[["ntree"]],
                     hdi.level = hdi.level,
-                    cores = cores,
-                    dot.param = dot.param)
+                    cores = cores)
   
   
   o <- getScores(p = p, s = s, 
