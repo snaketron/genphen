@@ -8,6 +8,7 @@
 
   \subsection{Changes:}{
     \itemize{
+      \item multi-trait analyses
       \item Bayesian hierarchical model implemented => multiple comparison solved
       \item Transition from effect size metrics to GLMs
       \item Posterior predictive checks automatic

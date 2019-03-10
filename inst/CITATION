@@ -1,15 +1,17 @@
-citHeader("To cite the psych package in publications use:")
+citHeader("To cite the genphen package in publications use:")
 citEntry(entry="Manual",
-         title = "genphen: A tool for computing genotype-phenotype associations
-         using statistical learning techniques",
+         title = "genphen: a tool for quantification of associations between genotypes and
+         phenotypes in genome wide association studies (GWAS) with Bayesian inference and
+         statistical learning",
          author = "Simo Kitanovski",
          Organization = " University Duisburg-Essen",
          address = " Essen, Germany",
          year = 2016,
-         note = "R package version 2.0",
+         note = "R package version 1.10",
          url = "http://bioconductor.org/packages/genphen/",
          textVersion =
          paste("Simo Kitanovski (2016) ",
-               " genphen: A tool for computing genotype-phenotype associations
-               using statistical learning techniques, ",
+               " genphen: a tool for quantification of associations between
+         genotypes and phenotypes in genome wide association studies (GWAS)
+         with Bayesian inference and statistical learning",
                " University Duisburg-Essen, Essen, Germany, ",sep="") )
