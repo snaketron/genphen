@@ -17,7 +17,8 @@ import(
   ranger,
   parallel,
   foreach,
-  doParallel
+  doParallel,
+  rPref
 )
 importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")

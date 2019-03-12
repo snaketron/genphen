@@ -251,6 +251,14 @@ complete kinship matrix. For a complete phylogenetic bias, $B = 1$ and $B = 0$
 and each pair of genotypes.
 
 
+\subsection{Pareto Optimization}
+We use Pareto optimization (with R package \texttt{rPref}) to rank the SNPs 
+based on their multi-factorial association. Given that $CA$ is encoded into 
+$\kappa$, we use only $\beta$ and $\kappa$ with an objective function that 
+prioritizes SNPs which score high with respect to both of them. The Pareto
+optimization procedure assigns each SNP to a non-dominated front (rank).
+
+
 \newpage
 \section{Case studies}
 \subsection{I: Association between SNPs and a *quantiative* phenotype}
@@ -397,7 +405,7 @@ g <- ggplot(data = c.score)+
              shape = 21, size = 4)+
   geom_text_repel(aes(x = ca.mean, y = beta.mean, label = label), size = 5)+
   theme_bw(base_size = 14)+
-  ylab(label = "Effect size (with 95% HDI)")+
+  ylab(label = expression("Effect size ("*beta*") (with 95% HDI)"))+
   scale_x_continuous(name = "CA", limits = c(0, 1.05))+
   geom_hline(yintercept = 0, linetype = "dashed")+
   theme(legend.position = "top")+
@@ -451,6 +459,40 @@ print(xtable(c.score[, c("label", "beta.mean", "beta.hdi", "ca.mean",
              align = rep(x = "c", times = 8, digits = 2)),
       include.rownames = FALSE, size = "scriptsize")
 @
+
+
+
+\paragraph{Pareto optimization}
+We use Pareto optimization (with R package \texttt{rPref}) to rank the SNPs 
+based on their multi-factorial association. Given that $CA$ is encoded into 
+$\kappa$, we use only $\beta$ and $\kappa$ with an objective function that 
+prioritizes SNPs which score high with respect to both of them. The results 
+from the Pareto optimization procedure are shown below:
+
+\begin{scriptsize}
+<<echo=TRUE, include=TRUE, results=hide>>=
+
+# Visualization
+g <- ggplot(data = c.score)+
+  facet_wrap(facets = ~phenotype.id, scales = "free")+
+  geom_line(aes(x = abs(beta.mean), y = kappa.mean, group = rank))+
+  geom_point(aes(x = abs(beta.mean), y = kappa.mean, col = rank))+
+  theme_bw()+
+  xlab(label = expression("|"*beta*"|"))+
+  ylab(label = expression(kappa))+
+  scale_color_gradientn(colours = terrain.colors(n = 10))
+
+g
+@
+\end{scriptsize}
+
+
+\begin{figure}[H]
+\centering
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=7.5>>=
+g
+@
+\end{figure}
 
 
 
@@ -707,7 +749,7 @@ g1 <- ggplot(data = m.score[m.score$phenotype.id == 1, ])+
              shape = 21, size = 4)+
   geom_text_repel(aes(x = ca.mean, y = beta.mean, label = label), size = 5)+
   theme_bw(base_size = 14)+
-  ylab(label = "Effect size (with 95% HDI)")+
+  ylab(label = expression("Effect size ("*beta*") (with 95% HDI)"))+
   scale_x_continuous(name = "CA", limits = c(0, 1.05))+
   geom_hline(yintercept = 0, linetype = "dashed")+
   theme(legend.position = "top")+
@@ -722,7 +764,7 @@ g2 <- ggplot(data = m.score[m.score$phenotype.id == 2, ])+
              shape = 21, size = 4)+
   geom_text_repel(aes(x = ca.mean, y = beta.mean, label = label), size = 5)+
   theme_bw(base_size = 14)+
-  ylab(label = "Effect size (with 95% HDI)")+
+  ylab(label = expression("Effect size ("*beta*") (with 95% HDI)"))+
   scale_x_continuous(name = "CA", limits = c(0, 1.05))+
   geom_hline(yintercept = 0, linetype = "dashed")+
   theme(legend.position = "top")+

@@ -968,6 +968,8 @@ checkInputPhyloBias <- function(input.kinship.matrix,
 
 
 
+
+
 # Description:
 # Given two vectors, one dependent (genotype) and one independent
 # (phenotype), compute the classification accuracy of classifying
@@ -987,7 +989,8 @@ runStatLearn <- function(genphen.data,
                     ntree, hdi.level, site) {
     
     
-    getBoot <- function(D, cv.fold, cv.steps, ntree, hdi.level) {
+    getBoot <- function(D, cv.fold, cv.steps, 
+                        ntree, hdi.level) {
       
       # posterior output (one extra for multi-trait)
       posterior <- vector(mode = "list", length = ncol(D)-1)
@@ -1070,109 +1073,9 @@ runStatLearn <- function(genphen.data,
         summary <- rbind(summary, row)
       }
       
-      return (summary)
+      return (list(summary = summary, 
+                   posterior = posterior))
     }
-    
-    
-    getBootBackup <- function(D, cv.fold, cv.steps, ntree, hdi.level) {
-      
-      # posterior output (one extra for multi-trait)
-      if(ncol(D) > 2) {
-        posterior <- vector(mode = "list", length = ncol(D))
-      }
-      else {
-        posterior <- vector(mode = "list", length = 1)
-      }
-      for(i in 1:length(posterior)) {
-        posterior[[i]] <- matrix(data = NA, nrow = cv.steps, ncol = 2)
-      }
-      rm(i)
-      
-      
-      D$Y <- as.character(D$Y)
-      for(i in 1:cv.steps) {
-        # sample at random
-        s <- sample(x = 1:nrow(D), size = ceiling(x = cv.fold*nrow(D)), 
-                    replace = FALSE)
-        train <- D[s, ]
-        test <- D[-s, ]
-        
-        
-        # TODO: dummy (check if inference needed at all e.g. 1 class only)
-        if(length(unique(train$Y)) == 1) {
-          for(j in 1:length(posterior)) {
-            posterior[[j]][i, ] <- c(NA, NA)
-          }
-        }
-        else {
-          for(j in 1:length(posterior)) {
-            # train classification model (try condition to avoid errors in case
-            # only one-level predictor is train data)
-            if(j == length(posterior) & j != 1) {
-              rf.out <- try(ranger::ranger(Y~., data = train,
-                                           num.trees = ntree), 
-                            silent = TRUE)
-            }
-            else {
-              rf.out <- try(ranger::ranger(Y~., data = train[, c(1, j+1)],
-                                           num.trees = ntree), 
-                            silent = TRUE)
-            }
-            
-            
-            if(class(rf.out) == "try-error") {
-              posterior[[j]][i, 1:2] <- c(NA, NA)
-            }
-            else {
-              # test classification model
-              pr <- stats::predict(object = rf.out, data = test)
-              
-              
-              # compute classification accuracy (1 - classification error)
-              test$Y <- as.character(test$Y)
-              pr$predictions <- as.character(pr$predictions)
-              ca <- sum(test$Y == pr$predictions)/nrow(test)
-              
-              
-              # compute k statistics
-              k <- getKappa(real = test$Y, 
-                            predicted = pr$predictions, 
-                            aas = unique(D$Y))
-              
-              posterior[[j]][i, 1:2] <- c(ca, k)
-            }
-          }
-        }
-      }
-      
-      # compute stats
-      summary <- c()
-      for(j in 1:length(posterior)) {
-        ca <- posterior[[j]][, 1]
-        ca <- ca[is.finite(ca)]
-        ca.mean <- mean(x = ca)
-        # get HDI
-        ca.hdi <- getHdi(vec = posterior[[j]][,1], hdi.level = hdi.level)
-        ca.L <- as.numeric(ca.hdi[1])
-        ca.H <- as.numeric(ca.hdi[2])
-        
-        k <- posterior[[j]][, 2]
-        k <- k[is.finite(k)]
-        k.mean <- mean(x = k)
-        # get HDI
-        k.hdi <- getHdi(vec = posterior[[j]][, 2], hdi.level = hdi.level)
-        k.L <- as.numeric(k.hdi[1])
-        k.H <- as.numeric(k.hdi[2])
-        
-        # summary append
-        row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
-                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
-        summary <- rbind(summary, row)
-      }
-      
-      return (summary)
-    }
-    
     
     
     i <- which(X %in% c(1, -1))
@@ -1199,116 +1102,16 @@ runStatLearn <- function(genphen.data,
                    cv.steps = cv.steps, 
                    hdi.level = hdi.level,
                    ntree = ntree)
-      result <- rbind(result, p)
+      result <- rbind(result, p$summary)
     }
-    return (result)
+    return (list(result = result,
+                 posterior = p$posterior))
   }
   
   
   # SVM analysis
   runSvm <- function(X, Y, cv.fold, cv.steps, 
                      hdi.level, site) {
-    
-    
-    getBootBackup <- function(D, cv.fold, cv.steps, hdi.level) {
-      
-      # posterior output (one extra for multi-trait)
-      if(ncol(D) > 2) {
-        posterior <- vector(mode = "list", length = ncol(D))
-      }
-      else {
-        posterior <- vector(mode = "list", length = 1)
-      }
-      for(i in 1:length(posterior)) {
-        posterior[[i]] <- matrix(data = NA, nrow = cv.steps, ncol = 2)
-      }
-      rm(i)
-      
-      
-      D$Y <- as.character(D$Y)
-      for(i in 1:cv.steps) {
-        # sample at random
-        s <- sample(x = 1:nrow(D), size = ceiling(x = cv.fold*nrow(D)), 
-                    replace = FALSE)
-        train <- D[s, ]
-        test <- D[-s, ]
-        
-        
-        # TODO: dummy (check if inference needed at all e.g. 1 class only)
-        if(length(unique(train$Y)) == 1) {
-          for(j in 1:length(posterior)) {
-            posterior[[j]][i, ] <- c(NA, NA)
-          }
-        }
-        else {
-          for(j in 1:length(posterior)) {
-            # train classification model (try condition to avoid errors in case
-            # only one-level predictor is train data)
-            if(j == length(posterior) & j != 1) {
-              svm.out <- try(e1071::svm(as.factor(Y) ~ ., 
-                                        data = train,
-                                        type = "C-classification"), 
-                             silent = TRUE)
-            }
-            else {
-              svm.out <- try(e1071::svm(as.factor(Y) ~ ., 
-                                        data = train[, c(1, j+1)],
-                                        type = "C-classification"), 
-                             silent = TRUE)
-            }
-            
-            
-            if(class(svm.out)[1] == "try-error") {
-              posterior[[j]][i, 1:2] <- c(NA, NA)
-            }
-            else {
-              # test classification model
-              pr <- stats::predict(object = svm.out, newdata = test)
-              
-              
-              # compute classification accuracy (1 - classification error)
-              test$Y <- as.character(test$Y)
-              pr <- as.character(pr)
-              ca <- sum(test$Y == pr)/nrow(test)
-              
-              
-              # compute k statistics
-              k <- getKappa(real = test$Y, predicted = pr, aas = unique(D$Y))
-              
-              posterior[[j]][i, 1:2] <- c(ca, k)
-            }
-          }
-        }
-      }
-      
-      # compute stats
-      summary <- c()
-      for(j in 1:length(posterior)) {
-        ca <- posterior[[j]][, 1]
-        ca <- ca[is.finite(ca)]
-        ca.mean <- mean(x = ca)
-        # get HDI
-        ca.hdi <- getHdi(vec = posterior[[j]][,1], hdi.level = hdi.level)
-        ca.L <- as.numeric(ca.hdi[1])
-        ca.H <- as.numeric(ca.hdi[2])
-        
-        k <- posterior[[j]][, 2]
-        k <- k[is.finite(k)]
-        k.mean <- mean(x = k)
-        # get HDI
-        k.hdi <- getHdi(vec = posterior[[j]][, 2], hdi.level = hdi.level)
-        k.L <- as.numeric(k.hdi[1])
-        k.H <- as.numeric(k.hdi[2])
-        
-        
-        # summary append
-        row <- data.frame(ca = ca.mean, ca.L = ca.L, ca.H = ca.H,
-                          k = k.mean, k.L = k.L, k.H = k.H, p = j)
-        summary <- rbind(summary, row)
-      }
-      
-      return (summary)
-    }
     
     
     getBoot <- function(D, cv.fold, cv.steps, hdi.level) {
@@ -1394,7 +1197,8 @@ runStatLearn <- function(genphen.data,
         summary <- rbind(summary, row)
       }
       
-      return (summary)
+      return (list(summary = summary,
+                   posterior = posterior))
     }
     
     
@@ -1421,10 +1225,52 @@ runStatLearn <- function(genphen.data,
                    cv.fold = cv.fold, 
                    cv.steps = cv.steps, 
                    hdi.level = hdi.level)
-      result <- rbind(result, p)
+      result <- rbind(result, p$summary)
     }
     
-    return (result)
+    return (list(result = result, 
+                 posterior = p$posterior))
+  }
+  
+  
+  # Format posterior
+  getPosteriorFormat <- function(cas) {
+    ca.list <- vector(mode = "list", length = length(cas[[1]]$posterior))
+    kappa.list <- vector(mode = "list", length = length(cas[[1]]$posterior))
+
+    # empty result matrix
+    results <- c()
+    for(i in 1:length(ca.list)) {
+      # empty posterior matrices
+      ca.m <- matrix(data = 0, nrow = nrow(cas[[1]]$posterior[[1]]),
+                     ncol = length(cas))
+      kappa.m <- matrix(data = 0, nrow = nrow(cas[[1]]$posterior[[1]]),
+                        ncol = length(cas))
+      
+      
+      for(j in 1:length(cas)) {
+        
+        # collect results
+        if(i == 1) {
+          row <- cas[[j]]$result
+          row$s <- j
+          results <- rbind(results, row)
+        }
+        
+        
+        # collect posteriors
+        ca.m[, j] <- cas[[j]]$posterior[[i]][, 1]
+        kappa.m[,j ] <- cas[[j]]$posterior[[i]][, 2]
+      }
+      
+      ca.list[[i]] <- ca.m
+      kappa.list[[i]] <- kappa.m
+    }
+    
+    
+    return (list(results = results,
+                 ca.list = ca.list,
+                 kappa.list = kappa.list))
   }
   
   
@@ -1459,9 +1305,14 @@ runStatLearn <- function(genphen.data,
   parallel::stopCluster(cl = cl)
   doParallel::stopImplicitCluster()
   
-  cas <- do.call(rbind, cas)
+  
+  # format posterior
+  cas <- getPosteriorFormat(cas = cas)
+  
   return (cas)
 }
+
+
 
 
 
@@ -1535,6 +1386,9 @@ getScores <- function(p, s,
   scores <- vector(mode = "list", length = ncol(genphen.data$Y))
   for(i in 1:ncol(genphen.data$Y)) {
     s.p <- s[s$p == i, ]
+    # list(results = results,
+    #      ca.list = ca.list,
+    #      kappa.list = kappa.list)
     
     key <- paste("beta\\[", i, "\\,", sep = '')
     d <- d.full[which(regexpr(pattern = key, text = d.full$par) != -1 
@@ -1550,6 +1404,32 @@ getScores <- function(p, s,
   return (scores)
 }
 
+
+
+
+
+
+# Description:
+# Combine data from Bayesian inference and statistical learning
+# betas = complete posterior
+# cas = list with matrix (posterior) elements for traits
+# kappa = list with matrix (posterior) elements for traits
+getParetoScores <- function(scores) {
+  phenotype.ids <- unique(scores$phenotype.id)
+  result <- c()
+  for(p in phenotype.ids) {
+    t <- scores[scores$phenotype.id == p, ]
+    p <- rPref::high(abs(t$beta.mean))*rPref::high(t$kappa.mean)
+    f <- rPref::psel(t, p, top = nrow(t)) 
+    f$rank <- f[, ".level"]
+    f[, ".level"] <- NULL
+    result <- rbind(result, f)
+  }
+  # p <- rPref::high(abs(scores$beta.mean))*
+  #   rPref::high(scores$ca.mean)*
+  #   rPref::high(scores$kappa.mean)
+  return (result)
+}
 
 
 

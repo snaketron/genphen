@@ -141,6 +141,8 @@ Estimates of the mean, standard error, standard deviation and HDI of the
 slope coefficient}
 \item{ca.mean, ca.hdi.low/ca.hdi.high}{CA estimate and HDI}
 \item{kappa.mean, kappa.hdi.low/kappa.hdi.high}{Cohen's kappa and HDI}
+\item{rank}{Pareto optimiazion based front (rank) of SNP/SAAP estimated by 
+maximizing metrics beta.mean and kappa.mean}
 
 \bold{MCMC convergence parameters:}
 \item{Neff}{Effective sampling size}

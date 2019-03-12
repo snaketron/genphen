@@ -83,10 +83,11 @@ runGenphen <- function(genotype,
                     cores = cores)
   
   
-  o <- getScores(p = p, s = s, 
+  
+  
+  o <- getScores(p = p, s = s$results, 
                  hdi.level = hdi.level, 
                  genphen.data = genphen.data)
-  
   
   
   # format scores
@@ -99,6 +100,12 @@ runGenphen <- function(genotype,
                    "beta.hdi.high", "Neff", "Rhat", 
                    "ca.mean", "ca.hdi.low", "ca.hdi.high", 
                    "kappa.mean", "kappa.hdi.low", "kappa.hdi.high")
+  
+  
+  
+  cat("======== Pareto Optimization ======== \n")
+  o <- getParetoScores(scores = o)
+  
   
   
   # ppc
