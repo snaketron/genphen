@@ -17,10 +17,11 @@ import(
   ranger,
   parallel,
   foreach,
-  doParallel,
-  rPref
+  doParallel
 )
 importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")
+importFrom("rPref", "high")
+importFrom("rPref", "psel")
 #exportPattern("^[[:alpha:]]+")
 useDynLib(genphen, .registration = TRUE)
