@@ -475,12 +475,16 @@ from the Pareto optimization procedure are shown below:
 # Visualization
 g <- ggplot(data = c.score)+
   facet_wrap(facets = ~phenotype.id, scales = "free")+
-  geom_line(aes(x = abs(beta.mean), y = kappa.mean, group = rank))+
-  geom_point(aes(x = abs(beta.mean), y = kappa.mean, col = rank))+
-  theme_bw()+
-  xlab(label = expression("|"*beta*"|"))+
-  ylab(label = expression(kappa))+
-  scale_color_gradientn(colours = terrain.colors(n = 10))
+  geom_line(aes(y = abs(beta.mean), x = kappa.mean, group = rank))+
+  geom_point(aes(y = abs(beta.mean), x = kappa.mean, fill = rank),
+             shape = 21, size = 4)+
+  geom_text_repel(aes(y = abs(beta.mean), x = kappa.mean, label = label), 
+                  size = 5)+
+  theme_bw(base_size = 14)+
+  ylab(label = expression("|"*beta*"|"))+
+  xlab(label = expression(kappa))+
+  scale_fill_gradientn(colours = terrain.colors(n = 10))+
+  theme(legend.position = "top")
 
 g
 @
@@ -489,7 +493,7 @@ g
 
 \begin{figure}[H]
 \centering
-<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=8, height=7.5>>=
+<<echo=FALSE, include=TRUE, results=hide, fig=TRUE, width=6, height=5>>=
 g
 @
 \end{figure}
