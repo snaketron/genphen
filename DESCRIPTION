@@ -3,8 +3,8 @@ Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes in genome wide association studies (GWAS) with Bayesian 
     inference and statistical learning
-Version: 1.13.6
-Date: 2019-07-23
+Version: 1.13.7
+Date: 2019-07-27
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
 Description: Genetic association studies are an essential tool for studying the 
@@ -15,15 +15,12 @@ Description: Genetic association studies are an essential tool for studying the
     vector machines, and Bayesian inference using hierarchical models. 
 License: GPL (>= 2)
 Depends: R (>= 3.5.0), Rcpp (>= 0.12.17), methods, stats, graphics
-Imports: rstan (>= 2.17.3), rstantools (>= 1.5.0), ranger, parallel, 
+Imports: rstan (>= 2.17.3), ranger, parallel, 
     foreach, doParallel, e1071, Biostrings, rPref
-LinkingTo: StanHeaders (>= 2.17.2), rstan (>= 2.17.3), BH (>= 1.66.0-1), 
-    Rcpp (>= 0.12.17), RcppEigen (>= 0.3.3.4.0)
-Suggests: testthat, ggplot2
+Suggests: testthat, ggplot2, gridExtra, ape, ggrepel, knitr, reshape, xtable
 LazyLoad: yes
 ByteCompile: true
 NeedsCompilation: yes
-SystemRequirements: GNU make
 Encoding: UTF-8
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,

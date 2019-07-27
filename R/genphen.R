@@ -47,16 +47,16 @@ runGenphen <- function(genotype,
   }
   
   
+  cat("======== Model Compilation ======== \n")
+  rstan::rstan_options(auto_write = TRUE)
   # select model
   if(model.type == "hierarchical") {
-    # model.stan <- hmi
-    # TODO: change to
-    model.stan <- stanmodels$H
+    model.file <- system.file("extdata", "H.stan", package = "genphen")
+    model.stan <- rstan::stan_model(file = model.file, auto_write = TRUE)
   }
   if(model.type == "univariate") {
-    # model.stan <- umi
-    # TODO: change to
-    model.stan <- stanmodels$U
+    model.file <- system.file("extdata", "U.stan", package = "genphen")
+    model.stan <- rstan::stan_model(file = model.file, auto_write = TRUE)
   }
   
   

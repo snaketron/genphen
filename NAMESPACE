@@ -12,8 +12,6 @@ import(
   graphics,
   e1071,
   Biostrings,
-  rstan,
-  rstantools,
   ranger,
   parallel,
   foreach,
@@ -23,5 +21,7 @@ importFrom("graphics", "hist")
 importFrom("stats", "bw.nrd0")
 importFrom("rPref", "high")
 importFrom("rPref", "psel")
-#exportPattern("^[[:alpha:]]+")
-useDynLib(genphen, .registration = TRUE)
+importFrom("rstan", "sampling")
+importFrom("rstan", "stan_model")
+importFrom("rstan", "summary")
+
