@@ -39,9 +39,12 @@ before_install:
   - mkdir -p ~/.R
   - echo "CXX14FLAGS=-O3 -mtune=native -march=native -Wno-unused-variable -Wno-unused-function  -Wno-macro-redefined" >> ~/.R/Makevars
   - echo "CXX14=g++ -std=c++1y -fPIC" >> ~/.R/Makevars
+<<<<<<< HEAD
 
 
 
 after_success:
   - travis_wait 40 Rscript -e 'covr::codecov(token = "8bad1b38-1b60-412b-b42c-2114ccf72ef7")'
 
+=======
+>>>>>>> 468f21869b20bc6ada81ce9632026b1b8aea63ed
