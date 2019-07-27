@@ -3,16 +3,16 @@ Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes in genome wide association studies (GWAS) with Bayesian 
     inference and statistical learning
-Version: 1.13.7
+Version: 1.13.8
 Date: 2019-07-27
 Author: Simo Kitanovski
 Maintainer: Simo Kitanovski <simo.kitanovski@uni-due.de>
-Description: Genetic association studies are an essential tool for studying the 
-    relationship between genotypes and phenotypes. With genphen we can jointly
-    study multiple phenotypes of different types, by quantifying the association 
-    between different genotypes and each phenotype using a hybrid method which 
-    uses statistical learning techniques such as random forest and support 
-    vector machines, and Bayesian inference using hierarchical models. 
+    Description: Genetic association studies are an essential tool for studying the 
+        relationship between genotypes and phenotypes. With genphen we can jointly
+        study multiple phenotypes of different types, by quantifying the association 
+        between different genotypes and each phenotype using a hybrid method which 
+        uses statistical learning techniques such as random forest and support 
+        vector machines, and Bayesian inference using hierarchical models. 
 License: GPL (>= 2)
 Depends: R (>= 3.5.0), Rcpp (>= 0.12.17), methods, stats, graphics
 Imports: rstan (>= 2.17.3), ranger, parallel, 

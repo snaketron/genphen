@@ -21,3 +21,4 @@ src/stan_files/*.cc
 vignettes/*.html
 vignettes/*.pdf
 
+.travis.yml
