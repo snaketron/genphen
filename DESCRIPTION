@@ -3,8 +3,8 @@ Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes in genome wide association studies (GWAS) with Bayesian 
     inference and statistical learning  
-Version: 1.13.11
-Date: 2019-07-31
+Version: 1.13.12
+Date: 2019-08-02
 Authors@R: 
     person(given = "Simo",
            family = "Kitanovski",
@@ -25,6 +25,7 @@ LazyLoad: yes
 ByteCompile: true
 NeedsCompilation: no
 Encoding: UTF-8
+BugReports: https://github.com/snaketron/genphen/issues
 biocViews: GenomeWideAssociation, Regression, Classification,
     SupportVectorMachine, Genetics, SequenceMatching, Bayesian,
     FeatureExtraction, Sequencing
