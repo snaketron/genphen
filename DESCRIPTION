@@ -3,7 +3,7 @@ Type: Package
 Title: A tool for quantification of associations between genotypes and
     phenotypes in genome wide association studies (GWAS) with Bayesian 
     inference and statistical learning  
-Version: 1.15.0
+Version: 1.16.0
 Date: 2019-08-02
 Authors@R: 
     person(given = "Simo",
