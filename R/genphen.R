@@ -111,7 +111,8 @@ runGenphen <- function(genotype,
   cat("======== Posterior Prediction ======== \n")
   ppc <- getPpc(posterior = p$posterior, 
                 genphen.data = genphen.data,
-                hdi.level = hdi.level)
+                hdi.level = hdi.level,
+                phenotype.type = phenotype.type)
   
   
   return (list(scores = o, 

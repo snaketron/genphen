@@ -985,7 +985,7 @@ runStatLearn <- function(genphen.data,
   
   
   # RF analysis
-  runRf <- function(X, Y, cv.fold, cv.steps, 
+  runRf <- function(Xd, Y, cv.fold, cv.steps, 
                     ntree, hdi.level, site) {
     
     
@@ -1020,8 +1020,10 @@ runStatLearn <- function(genphen.data,
             
             # train classification model (try condition to avoid errors in 
             # case only one-level predictor is train data)
-            rf.out <- try(ranger::ranger(Y~., data = train[, c(1, j+1)],
-                                         num.trees = ntree), silent = TRUE)
+            rf.out <- try(ranger::ranger(as.factor(Y)~., 
+                                         data = train[, c(1, j+1)],
+                                         num.trees = ntree), 
+                          silent = TRUE)
             
             if(class(rf.out) == "try-error") {
               posterior[[j]][i, 1:2] <- c(NA, NA)
@@ -1077,7 +1079,7 @@ runStatLearn <- function(genphen.data,
                    posterior = posterior))
     }
     
-    
+    X <- as.matrix(Xd[, site])
     i <- which(X %in% c(1, -1))
     D <- data.frame(Y = as.character(X))
     colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
@@ -1110,7 +1112,7 @@ runStatLearn <- function(genphen.data,
   
   
   # SVM analysis
-  runSvm <- function(X, Y, cv.fold, cv.steps, 
+  runSvm <- function(Xd, Y, cv.fold, cv.steps, 
                      hdi.level, site) {
     
     
@@ -1201,7 +1203,7 @@ runStatLearn <- function(genphen.data,
                    posterior = posterior))
     }
     
-    
+    X <- as.matrix(Xd[, site])
     i <- which(X %in% c(1, -1))
     D <- data.frame(Y = as.character(X))
     colnames(Y) <- paste("P", 1:ncol(Y), sep = '')
@@ -1274,37 +1276,26 @@ runStatLearn <- function(genphen.data,
   }
   
   
-  # multicore classification
-  cl <- parallel::makeCluster(cores)
-  doParallel::registerDoParallel(cl)
-  j <- NULL
   if(method == "rf") {
-    cas <- (foreach(j = 1:ncol(genphen.data$X),
-                    .export = c("getHdi", "getKappa"),
-                    .packages = c("ranger")) %dopar%
-              runRf(X = as.matrix(genphen.data$X[, j]),
-                    Y = genphen.data$Y,
-                    cv.fold = cv.fold,
-                    cv.steps = cv.steps,
-                    hdi.level = hdi.level,
-                    ntree = ntree,
-                    site = j))
+    cas <- lapply(X = 1:ncol(genphen.data$X), 
+                  FUN = runRf,
+                  Xd = genphen.data$X,
+                  Y = genphen.data$Y,
+                  cv.fold = cv.fold,
+                  cv.steps = cv.steps,
+                  hdi.level = hdi.level,
+                  ntree = ntree)
   }
   else if(method == "svm") {
-    cas <- (foreach(j = 1:ncol(genphen.data$X),
-                    .export = c("getHdi", "getKappa"),
-                    .packages = c("e1071")) %dopar%
-              runSvm(X = as.matrix(genphen.data$X[, j]),
-                     Y = genphen.data$Y,
-                     cv.fold = cv.fold,
-                     cv.steps = cv.steps,
-                     hdi.level = hdi.level,
-                     site = j))
+    cas <- lapply(X = 1:ncol(genphen.data$X), 
+                  FUN = runSvm,
+                  Xd = genphen.data$X,
+                  Y = genphen.data$Y,
+                  cv.fold = cv.fold,
+                  cv.steps = cv.steps,
+                  hdi.level = hdi.level,
+                  ntree = ntree)
   }
-  # stop cluster
-  parallel::stopCluster(cl = cl)
-  doParallel::stopImplicitCluster()
-  
   
   # format posterior
   cas <- getPosteriorFormat(cas = cas)
@@ -1437,135 +1428,60 @@ getParetoScores <- function(scores) {
 
 # Description:
 # Computes posterior prediction
-getPpc <- function(posterior, genphen.data, hdi.level) {
+getPpc <- function(posterior, genphen.data, 
+                   hdi.level, phenotype.type) {
   
-  ppc.Q <- function(p, x) {
-    return(p[1]+p[2]*x+p[3]*stats::rt(n = 1, df = p[4]))
-  }
   
-  ppc.mean.Q <- function(p, x) {
-    return(mean(replicate(n = 1, expr = p[1]+p[2]*x)))
-  }
-  
-  ppc.D <- function(p, x) {
-    o <- p[1]+p[2]*x
-    o <- exp(o)/(1+exp(o))
-    return(o)
-  }
-  
-  ppc.mean.D <- function(p, x) {
-    o <- replicate(n = 1, expr = p[1]+p[2]*x)
-    o <- 1/(1 + exp(-(o)))
-    return(mean(o))
-  }
-  
-  getParamKeys <- function(p, i, genphen.data) {
-    alpha.key <- paste("alpha.", p, ".", i,  sep = '')
-    beta.key <- paste("beta.", p, ".", i,  sep = '')
-    
-    if(genphen.data$Ntq == 1) {
-      sigma.key <- "sigma"
-      nu.key <- "nu"
-    }
-    else {
-      sigma.key <- paste("sigma.", p, sep = '')
-      nu.key <- paste("nu.", p, sep = '')
-    }
-    
-    p <- c(alpha.key, beta.key, sigma.key, nu.key)
-    return (p)
-  }
+  ppc <- rstan::summary(object = posterior, prob = c(
+    (1-hdi.level)/2, 0.5, 1-(1-hdi.level)/2), 
+    par = "Y_hat")$summary
+  ppc <- data.frame(ppc)
+  ppc$par <- rownames(ppc)
+  ppc$par <- gsub(pattern = "Y_hat|\\[|\\]", 
+                    replacement = '', x = ppc$par)
+  par.map <- do.call(rbind, strsplit(x = ppc$par, split = ','))
+  ppc$trait <- par.map[, 1]
+  ppc$X <- ifelse(test = par.map[, 2]=="1", yes = 1, no = -1)
+  ppc$S <- par.map[, 3]
   
   
   
-  # extract posterior
-  posterior <- data.frame(rstan::extract(object = posterior))
-  max.nrow <- ifelse(test = 1000 > nrow(posterior), 
-                     yes = nrow(posterior), no = 1000)
-  posterior <- posterior[sample(x = 1:nrow(posterior), 
-                                size = max.nrow, 
-                                replace = TRUE), ]
+  # pos
+  ppc.X.p <- ppc[ppc$X==1, ]
+  colnames(ppc.X.p) <- c("ref.mean", "ref.se.mean", "ref.sd",
+                           "ref.L", "ref.median", "ref.H", "ref.Neff",
+                           "ref.Rhat", "par", "trait", "X", "S")
+  ppc.X.p$X <- NULL
+  ppc.X.p$par <- NULL
   
-  xmap <- genphen.data$xmap
-  ppc <- vector(mode = "list", length = length(genphen.data$phenotype.type))
   
-  for(p in 1:length(ppc)) {
-    
-    ppc.out <- vector(mode = "list", length = nrow(xmap))
-    ppc.vec <- numeric(length = 8)
-    
-    for(i in 1:nrow(xmap)) {
-      p.keys <- getParamKeys(p = p, i = i, genphen.data = genphen.data)
-      
-      # REF
-      ref <- which(genphen.data$X[, i] == 1)
-      ref.p <- NA
-      if(length(ref) != 0) {
-        if(genphen.data$phenotype.type[p] == "Q") {
-          ref.p <- genphen.data$Y[ref, p]
-          ppc.vec[1] <- mean(ref.p)
-          ppc.data <- apply(X = posterior[, p.keys], MARGIN = 1, 
-                            FUN = ppc.Q, x = 1)
-          ppc.hdi <- getHdi(vec = ppc.data, hdi.level = hdi.level)
-          ppc.vec[2] <- mean(ppc.data)
-          ppc.vec[3] <- ppc.hdi[1]
-          ppc.vec[4] <- ppc.hdi[2]
-        }
-        if(genphen.data$phenotype.type[p] == "D") {
-          ref.p <- genphen.data$Y[ref, p]
-          ppc.vec[1] <- sum(ref.p == 1)/length(ref.p)
-          ppc.data <- apply(X = posterior[, p.keys[1:2]], MARGIN = 1, 
-                            FUN = ppc.D, x = -1)
-          ppc.hdi <- getHdi(vec = ppc.data, hdi.level = hdi.level)
-          ppc.vec[2] <- mean(ppc.data)
-          ppc.vec[3] <- ppc.hdi[1]
-          ppc.vec[4] <- ppc.hdi[2]
-        }
-      }
-      
-      # ALT
-      alt <- which(genphen.data$X[, i] == -1)
-      alt.p <- NA
-      if(length(alt) != 0) {
-        if(genphen.data$phenotype.type[p] == "Q") {
-          alt.p <- genphen.data$Y[alt, p]
-          ppc.vec[5] <- mean(alt.p)
-          ppc.data <- apply(X = posterior[, p.keys], MARGIN = 1, 
-                            FUN = ppc.Q, x = -1)
-          ppc.hdi <- getHdi(vec = ppc.data, hdi.level = hdi.level)
-          ppc.vec[6] <- mean(ppc.data)
-          ppc.vec[7] <- ppc.hdi[1]
-          ppc.vec[8] <- ppc.hdi[2]
-        }
-        if(genphen.data$phenotype.type[p] == "D") {
-          alt.p <- genphen.data$Y[alt, p]
-          ppc.vec[5] <- sum(alt.p == 1)/length(alt.p)
-          ppc.data <- apply(X = posterior[, p.keys[1:2]], 
-                            MARGIN = 1, FUN = ppc.D, x = -1)
-          ppc.hdi <- getHdi(vec = ppc.data, hdi.level = hdi.level)
-          ppc.vec[6] <- mean(ppc.data)
-          ppc.vec[7] <- ppc.hdi[1]
-          ppc.vec[8] <- ppc.hdi[2]
-        }
-      }
-      
-      ppc.out[[i]] <- list(site = xmap$site[i],
-                           ref = xmap$ref[i],
-                           alt = xmap$alt[i],
-                           ref.Y = ref.p,
-                           alt.Y = alt.p,
-                           ref.real = ppc.vec[1],
-                           ref.ppc = ppc.vec[2],
-                           ref.ppc.hdi.low = ppc.vec[3],
-                           ref.ppc.hdi.high = ppc.vec[4],
-                           alt.real = ppc.vec[5],
-                           alt.ppc = ppc.vec[6],
-                           alt.ppc.hdi.low = ppc.vec[7],
-                           alt.ppc.hdi.high = ppc.vec[8])
-    }
-    
-    ppc[[p]] <- ppc.out
-  }
+  
+  # neg
+  ppc.X.m <- ppc[ppc$X==-1, ]
+  colnames(ppc.X.m) <- c("alt.mean", "alt.se_mean", "alt.sd",
+                           "alt.L", "alt.median", "alt.H", "alt.Neff",
+                           "alt.Rhat", "par", "trait", "X", "S")
+  ppc.X.m$X <- NULL
+  ppc.X.m$par <- NULL
+  
+  
+  # merge ref vs. alt cols
+  ppc <- merge(x = ppc.X.p, y = ppc.X.m,
+                 by = c("trait", "S"))
+  rm(ppc.X.m, ppc.X.p)
+  ppc$S <- as.numeric(ppc$S)
+  ppc$trait <- as.numeric(ppc$trait)
+  ppc <- ppc[with(ppc, order(trait, S, decreasing = F)), ]
+  
+  
+  # add info on data
+  ppc <- cbind(genphen.data$xmap, ppc)
+  
+  
+  # set trait types
+  ppc$trait.type <- rep(x = phenotype.type, 
+                        each = max(ppc$S))
+  
   
   return (ppc)
 }

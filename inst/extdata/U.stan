@@ -14,7 +14,6 @@ parameters {
   vector [Nsk] alpha [Ntq+Ntd];
   vector [Nsk] beta [Ntq+Ntd];
   vector <lower = 0> [Ntq] sigma;
-  vector <lower = 1> [Ntq] nu;
 }
 
 
@@ -22,20 +21,39 @@ model {
   for(i in 1:N) {
     if(Ntq > 0) {
       for(t in 1:Ntq) {
-        Yq[i,t] ~ student_t(nu[t], alpha[t] + rows_dot_product(X[i], beta[t]), sigma[t]);
+        Yq[i,t] ~ normal(alpha[t] + X[i] .* beta[t], sigma[t]);
       }
     }
     if(Ntd > 0) {
       for(d in 1:Ntd) {
-        Yd[i,d] ~ bernoulli_logit(alpha[d+Ntq] + rows_dot_product(X[i], beta[d+Ntq]));
+        Yd[i,d] ~ bernoulli_logit(alpha[d+Ntq] + X[i] .* beta[d+Ntq]);
       }
     }
   }
   
-  nu ~ gamma(2, 0.1);
   sigma ~ cauchy(0, 5);
   for(t in 1:(Ntq+Ntd)) {
     beta[t] ~ student_t(1, 0, 10);
     alpha[t] ~ student_t(1, 0, 100);
+  }
+}
+
+generated quantities {
+  vector [Nsk] Y_hat [Ntq+Ntd, 2]; 
+  
+  
+  for(i in 1:N) {
+    if(Ntq > 0) {
+      for(t in 1:Ntq) {
+        Y_hat[t, 1] = to_vector(normal_rng(alpha[t] + beta[t], sigma[t]));
+        Y_hat[t, 2] = to_vector(normal_rng(alpha[t] + -beta[t], sigma[t]));
+      }
+    }
+    if(Ntd > 0) {
+      for(d in 1:Ntd) {
+        Y_hat[d+Ntq, 1] = to_vector(bernoulli_rng(inv_logit(alpha[d+Ntq] + beta[d+Ntq])));
+        Y_hat[d+Ntq, 2] = to_vector(bernoulli_rng(inv_logit(alpha[d+Ntq] + -beta[d+Ntq])));
+      }
+    }
   }
 }
