@@ -1293,8 +1293,7 @@ runStatLearn <- function(genphen.data,
                   Y = genphen.data$Y,
                   cv.fold = cv.fold,
                   cv.steps = cv.steps,
-                  hdi.level = hdi.level,
-                  ntree = ntree)
+                  hdi.level = hdi.level)
   }
   
   # format posterior
