@@ -33,6 +33,7 @@ script:
 
 
 before_install:
+  - sudo apt-get -y install libv8-dev
   - R -q -e 'install.packages(c("BH", "Rcpp", "RcppEigen",
                                 "StanHeaders", "rstantools",
                                 "rstan", "covr"))'
