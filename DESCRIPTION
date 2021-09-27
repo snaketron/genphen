@@ -1,8 +1,7 @@
 Package: genphen
 Type: Package
-Title: A tool for quantification of associations between genotypes and
-    phenotypes in genome wide association studies (GWAS) with Bayesian 
-    inference and statistical learning  
+Title: genphen: tool for quantification of genotype-phenotype 
+    associations in genome wide association studies (GWAS)
 Version: 1.21.1
 Date: 2021-09-28
 Authors@R: 
